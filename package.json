@@ -1,5 +1,6 @@
 {
-  "name": "rviz-web",
+  "name": "tstudio",
+  "description": "tStudio - A web-based 3D data visualization tool",
   "version": "0.0.1",
   "private": true,
   "scripts": {

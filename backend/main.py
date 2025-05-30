@@ -7,7 +7,7 @@ import asyncio
 import numpy as np
 from datetime import datetime
 
-app = FastAPI(title="RViz-like 3D Visualizer")
+app = FastAPI(title="tStudio backend")
 
 # CORS middleware
 app.add_middleware(
