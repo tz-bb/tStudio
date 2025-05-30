@@ -2,11 +2,11 @@
 
 dev:
 	@echo "Starting development servers..."
-	@concurrently "make dev-frontend" "make dev-backend"
+	@make -j2 "dev-frontend" "dev-backend"
 
 dev-frontend:
 	@echo "Starting frontend..."
-	@npm run dev
+	@cd frontend && npm run dev
 
 dev-backend:
 	@echo "Starting backend..."
@@ -14,7 +14,7 @@ dev-backend:
 
 install:
 	@echo "Installing dependencies..."
-	@npm install
+	@cd frontend && npm install
 	@cd backend && pip install -r requirements.txt
 
 clean:
