@@ -23,7 +23,8 @@
   "dependencies": {
     "@threlte/core": "^7.0.0",
     "@threlte/extras": "^8.0.0",
-    "three": "^0.158.0"
+    "three": "^0.158.0",
+    "roslib": "^1.3.0"
   },
   "type": "module"
 }

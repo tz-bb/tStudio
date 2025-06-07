@@ -1,11 +1,14 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from typing import List, Dict, Any
 import json
 import asyncio
-import numpy as np
 from datetime import datetime
+from pydantic import BaseModel
+
+# 导入我们的模块
+from core.data_source_manager import DataSourceManager
 
 app = FastAPI(title="tStudio backend")
 
@@ -28,7 +31,8 @@ class ConnectionManager:
         self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
 
     async def broadcast(self, message: dict):
         for connection in self.active_connections:
@@ -38,108 +42,137 @@ class ConnectionManager:
                 pass
 
 manager = ConnectionManager()
+data_source_manager = DataSourceManager()
 
-# 数据存储
-class DataStore:
-    def __init__(self):
-        self.topics = {
-            "point_cloud": {
-                "type": "PointCloud",
-                "enabled": True,
-                "color": "#ff0000",
-                "size": 0.1,
-                "data": []
-            },
-            "markers": {
-                "type": "Markers",
-                "enabled": True,
-                "color": "#00ff00",
-                "scale": 1.0,
-                "data": []
-            },
-            "grid": {
-                "type": "Grid",
-                "enabled": True,
-                "color": "#888888",
-                "size": 10,
-                "divisions": 10,
-                "data": None
-            }
-        }
+# 请求模型
+class ConnectionRequest(BaseModel):
+    adapter: str
+    config: Dict[str, Any]
+
+class TopicSubscriptionRequest(BaseModel):
+    topic: str
+    message_type: str = None
+
+# API路由
+@app.get("/api/adapters")
+async def get_available_adapters():
+    """获取可用的数据源适配器"""
+    return {
+        "adapters": data_source_manager.get_available_adapters()
+    }
+
+@app.post("/api/connection/connect")
+async def connect_to_adapter(request: ConnectionRequest):
+    """连接到数据源"""
+    success = await data_source_manager.connect_adapter(request.adapter, request.config)
     
-    def generate_sample_data(self):
-        # 生成示例点云数据
-        points = []
-        for i in range(2000):
-            x = np.random.uniform(-5, 5)
-            y = np.random.uniform(-5, 5)
-            z = np.random.uniform(0, 3)
-            points.append([x, y, z])
-        self.topics["point_cloud"]["data"] = points
-        
-        # 生成示例标记数据
-        markers = []
-        for i in range(10):
-            marker = {
-                "id": i,
-                "position": [np.random.uniform(-3, 3), np.random.uniform(-3, 3), np.random.uniform(0, 2)],
-                "rotation": [0, 0, 0],
-                "scale": [0.5, 0.5, 0.5],
-                "type": "cube"
-            }
-            markers.append(marker)
-        self.topics["markers"]["data"] = markers
+    if success:
+        # 广播连接状态更新
+        await manager.broadcast({
+            "type": "connection_status",
+            "data": data_source_manager.get_connection_status()
+        })
+        return {"success": True, "message": "Connected successfully"}
+    else:
+        raise HTTPException(status_code=400, detail="Failed to connect to adapter")
 
-data_store = DataStore()
-data_store.generate_sample_data()
+@app.post("/api/connection/disconnect")
+async def disconnect_from_adapter():
+    """断开当前连接"""
+    success = await data_source_manager.disconnect_current_adapter()
+    
+    if success:
+        await manager.broadcast({
+            "type": "connection_status",
+            "data": data_source_manager.get_connection_status()
+        })
+        return {"success": True, "message": "Disconnected successfully"}
+    else:
+        raise HTTPException(status_code=400, detail="Failed to disconnect")
+
+@app.get("/api/connection/status")
+async def get_connection_status():
+    """获取连接状态"""
+    return data_source_manager.get_connection_status()
 
 @app.get("/api/topics")
-async def get_topics():
-    """获取所有数据主题"""
-    return {"topics": list(data_store.topics.keys())}
+async def get_available_topics():
+    """获取可用话题"""
+    topics = await data_source_manager.get_available_topics()
+    return {"topics": topics}
 
-@app.get("/api/topics/{topic_name}")
-async def get_topic_data(topic_name: str):
-    """获取特定主题的数据"""
-    if topic_name in data_store.topics:
-        return data_store.topics[topic_name]
-    return {"error": "Topic not found"}
-
-@app.post("/api/topics/{topic_name}/config")
-async def update_topic_config(topic_name: str, config: Dict[str, Any]):
-    """更新主题配置"""
-    if topic_name in data_store.topics:
-        data_store.topics[topic_name].update(config)
-        # 广播配置更新
+@app.post("/api/topics/subscribe")
+async def subscribe_to_topic(request: TopicSubscriptionRequest):
+    """订阅话题"""
+    print(f"Received subscription request: topic={request.topic}, message_type={request.message_type}")
+    
+    success = await data_source_manager.subscribe_topic(request.topic, request.message_type)
+    
+    if success:
         await manager.broadcast({
-            "type": "config_update",
-            "topic": topic_name,
-            "config": data_store.topics[topic_name]
+            "type": "topic_subscribed",
+            "topic": request.topic
         })
-        return {"success": True}
-    return {"error": "Topic not found"}
+        return {"success": True, "message": f"Subscribed to {request.topic}"}
+    else:
+        raise HTTPException(status_code=400, detail=f"Failed to subscribe to {request.topic}")
+
+@app.post("/api/topics/unsubscribe")
+async def unsubscribe_from_topic_by_query(topic: str = Query(...)):
+    """通过查询参数取消订阅话题"""
+    success = await data_source_manager.unsubscribe_topic(topic)
+    
+    if success:
+        await manager.broadcast({
+            "type": "topic_unsubscribed",
+            "topic": topic
+        })
+        return {"success": True, "message": f"Unsubscribed from {topic}"}
+    else:
+        raise HTTPException(status_code=400, detail=f"Failed to unsubscribe from {topic}")
+
+# 数据回调函数
+async def on_data_received(topic: str, data: Any):
+    """数据接收回调"""
+    await manager.broadcast({
+        "type": "data_update",
+        "topic": topic,
+        "data": data
+    })
+
+# 注册数据回调
+data_source_manager.add_data_callback(on_data_received)
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
-        # 发送初始数据
+        # 发送初始连接状态
         await websocket.send_text(json.dumps({
-            "type": "initial_data",
-            "data": data_store.topics
+            "type": "connection_status",
+            "data": data_source_manager.get_connection_status()
         }))
         
         while True:
-            # 模拟实时数据更新
-            await asyncio.sleep(0.01)
-            data_store.generate_sample_data()
-            await manager.broadcast({
-                "type": "data_update",
-                "data": data_store.topics
-            })
+            # 保持连接活跃
+            await asyncio.sleep(1)
             
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+
+@app.post("/api/topics/{topic_name}/config")
+async def update_topic_config(topic_name: str, config: dict):
+    """更新话题配置（占位实现）"""
+    print(f"收到配置更新请求: topic={topic_name}, config={config}")
+    
+    # 广播配置更新给前端
+    await manager.broadcast({
+        "type": "config_update",
+        "topic": topic_name,
+        "config": config
+    })
+    
+    return {"success": True, "message": f"Config updated for {topic_name}"}
 
 if __name__ == "__main__":
     import uvicorn

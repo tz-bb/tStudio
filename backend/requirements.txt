@@ -3,3 +3,6 @@ uvicorn[standard]
 websockets
 numpy
 python-multipart
+roslibpy
+pydantic
+aiofiles

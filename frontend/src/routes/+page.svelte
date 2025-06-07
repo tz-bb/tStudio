@@ -2,11 +2,15 @@
 	import Scene3D from '$lib/components/Scene3D.svelte';
 	import ControlPanel from '$lib/components/ControlPanel.svelte';
 	import { onMount } from 'svelte';
-	import { topicsStore, websocketStore } from '$lib/stores/dataStore.js';
+	import { websocketStore } from '$lib/stores/dataStore.js';
+	import { connectionStore } from '$lib/stores/connectionStore.js';
 
 	onMount(() => {
 		// 初始化WebSocket连接
 		websocketStore.connect();
+		
+		// 加载可用适配器
+		connectionStore.loadAvailableAdapters();
 	});
 </script>
 
