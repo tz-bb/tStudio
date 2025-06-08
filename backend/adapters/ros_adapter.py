@@ -167,7 +167,7 @@ class ROSAdapter(BaseAdapter):
         """处理ROS消息"""
         try:
             # 转换ROS消息为tStudio格式
-            converted_data = self._convert_ros_message(topic, message_type, message)
+            converted_data = self._convert_ros_message(topic, message, message_type)  # 修复：调整参数顺序
             
             if converted_data and self._main_loop:
                 # 使用保存的主事件循环来调度异步任务
@@ -181,23 +181,23 @@ class ROSAdapter(BaseAdapter):
     def _convert_ros_message(self, topic: str, message: dict, message_type: str) -> Optional[Dict[str, Any]]:
         """转换ROS消息为统一格式"""
         try:
-            if message_type == 'sensor_msgs/PointCloud2':
-                return self._convert_pointcloud2(message)
-            elif message_type == 'visualization_msgs/MarkerArray':
-                return self._convert_marker_array(message)
-            elif message_type == 'geometry_msgs/PoseStamped':
-                return self._convert_pose_stamped(message)
-            elif message_type == 'nav_msgs/OccupancyGrid':
-                return self._convert_occupancy_grid(message)
-            else:
-                # 通用转换
-                return {
-                    'topic': topic,
-                    'type': 'generic',
-                    'message_type': message_type,
-                    'data': message,
-                    'timestamp': time.time()  # 修复：使用 time.time() 替代 asyncio.get_event_loop().time()
-                }
+            # if message_type == 'sensor_msgs/PointCloud2':
+            #     return self._convert_pointcloud2(message)
+            # elif message_type == 'visualization_msgs/MarkerArray':
+            #     return self._convert_marker_array(message)
+            # elif message_type == 'geometry_msgs/PoseStamped':
+            #     return self._convert_pose_stamped(message)
+            # elif message_type == 'nav_msgs/OccupancyGrid':
+            #     return self._convert_occupancy_grid(message)
+            # else:
+            # 通用转换
+            return {
+                'topic': topic,
+                'type': 'generic',
+                'message_type': message_type,
+                'data': message,
+                'timestamp': time.time()  # 修复：使用 time.time() 替代 asyncio.get_event_loop().time()
+            }
                 
         except Exception as e:
             print(f"Error converting ROS message: {e}")

@@ -145,19 +145,60 @@ data_source_manager.add_data_callback(on_data_received)
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
+    client_host = websocket.client.host if websocket.client else "unknown"
+    print(f"[WebSocket] 新的连接请求来自: {client_host}")
+    
     try:
+        await manager.connect(websocket)
+        print(f"[WebSocket] 客户端 {client_host} 连接成功")
+        
         # 发送初始连接状态
-        await websocket.send_text(json.dumps({
+        initial_status = {
             "type": "connection_status",
             "data": data_source_manager.get_connection_status()
-        }))
+        }
+        await websocket.send_text(json.dumps(initial_status))
+        print(f"[WebSocket] 已发送初始状态给客户端 {client_host}: {initial_status}")
         
+        # 发送欢迎消息
+        welcome_msg = {
+            "type": "system_message",
+            "data": {
+                "message": "WebSocket连接建立成功",
+                "timestamp": datetime.now().isoformat(),
+                "server_info": "tStudio Backend v1.0"
+            }
+        }
+        await websocket.send_text(json.dumps(welcome_msg))
+        
+        # 保持连接活跃并定期发送心跳
+        heartbeat_counter = 0
         while True:
-            # 保持连接活跃
-            await asyncio.sleep(1)
+            await asyncio.sleep(5)  # 每5秒发送一次心跳
+            heartbeat_counter += 1
             
+            # 发送心跳消息
+            heartbeat = {
+                "type": "heartbeat",
+                "data": {
+                    "counter": heartbeat_counter,
+                    "timestamp": datetime.now().isoformat(),
+                    "active_connections": len(manager.active_connections)
+                }
+            }
+            
+            try:
+                await websocket.send_text(json.dumps(heartbeat))
+                print(f"[WebSocket] 心跳 #{heartbeat_counter} 发送给 {client_host}")
+            except Exception as e:
+                print(f"[WebSocket] 发送心跳失败给 {client_host}: {e}")
+                break
+                
     except WebSocketDisconnect:
+        print(f"[WebSocket] 客户端 {client_host} 正常断开连接")
+        manager.disconnect(websocket)
+    except Exception as e:
+        print(f"[WebSocket] 客户端 {client_host} 连接异常: {e}")
         manager.disconnect(websocket)
 
 @app.post("/api/topics/{topic_name}/config")

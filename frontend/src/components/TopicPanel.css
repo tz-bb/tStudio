@@ -1,0 +1,84 @@
+.topic-panel {
+  padding: 20px;
+  flex: 1;
+}
+
+.topic-panel h3 {
+  margin: 0 0 15px 0;
+  color: #fff;
+}
+
+.refresh-btn {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 15px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #3d3d3d;
+  color: white;
+  cursor: pointer;
+}
+
+.refresh-btn:hover {
+  background: #4d4d4d;
+}
+
+.topics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.topic-item {
+  background: #3d3d3d;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 10px;
+}
+
+.topic-info {
+  margin-bottom: 8px;
+}
+
+.topic-name {
+  font-weight: bold;
+  color: #fff;
+  font-size: 14px;
+}
+
+.topic-type {
+  color: #ccc;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.topic-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.subscribe-btn,
+.unsubscribe-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.subscribe-btn {
+  background: #2196f3;
+  color: white;
+}
+
+.unsubscribe-btn {
+  background: #ff9800;
+  color: white;
+}
+
+.no-topics {
+  text-align: center;
+  color: #ccc;
+  font-style: italic;
+  margin-top: 20px;
+}

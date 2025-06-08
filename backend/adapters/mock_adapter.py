@@ -1,5 +1,6 @@
 import asyncio
 import numpy as np
+import time  # 添加 time 模块导入
 from typing import Dict, Any, List
 from .base_adapter import BaseAdapter
 from datetime import datetime
@@ -90,65 +91,111 @@ class MockAdapter(BaseAdapter):
     def _generate_mock_data(self, topic: str) -> Dict[str, Any]:
         """生成模拟数据"""
         if topic == "/point_cloud":
-            return self._generate_point_cloud()
+            return self._generate_point_cloud(topic)
         elif topic == "/markers":
-            return self._generate_markers()
+            return self._generate_markers(topic)
         elif topic == "/grid":
-            return self._generate_grid()
+            return self._generate_grid(topic)
         elif topic == "/robot_pose":
-            return self._generate_pose()
+            return self._generate_pose(topic)
         else:
-            return {"topic": topic, "data": "mock_data", "timestamp": datetime.now().isoformat()}
+            return {
+                'topic': topic,
+                'type': 'generic',
+                'message_type': 'unknown',
+                'data': {"topic": topic, "data": "mock_data"},
+                'timestamp': time.time()
+            }
     
-    def _generate_point_cloud(self) -> Dict[str, Any]:
+    def _generate_point_cloud(self, topic: str) -> Dict[str, Any]:
         """生成点云数据"""
         points = []
         for i in range(2000):
             x = np.random.uniform(-5, 5)
             y = np.random.uniform(-5, 5)
             z = np.random.uniform(0, 3)
-            points.append([x, y, z])
+            points.append({"x": x, "y": y, "z": z})
         
         return {
-            "type": "PointCloud",
-            "points": points,
-            "timestamp": datetime.now().isoformat()
+            'topic': topic,
+            'type': 'generic',
+            'message_type': 'sensor_msgs/PointCloud2',
+            'data': {
+                "type": "PointCloud",
+                "points": points
+            },
+            'timestamp': time.time()
         }
     
-    def _generate_markers(self) -> Dict[str, Any]:
+    def _generate_markers(self, topic: str) -> Dict[str, Any]:
         """生成标记数据"""
         markers = []
         for i in range(10):
             marker = {
                 "id": i,
-                "position": [np.random.uniform(-3, 3), np.random.uniform(-3, 3), np.random.uniform(0, 2)],
-                "rotation": [0, 0, 0],
-                "scale": [0.5, 0.5, 0.5],
+                "position": {
+                    "x": np.random.uniform(-3, 3),
+                    "y": np.random.uniform(-3, 3),
+                    "z": np.random.uniform(0, 2)
+                },
+                "rotation": {"x": 0, "y": 0, "z": 0},
+                "scale": {"x": 0.5, "y": 0.5, "z": 0.5},
                 "type": "cube",
-                "color": [np.random.random(), np.random.random(), np.random.random(), 1.0]
+                "color": {
+                    "r": np.random.random(),
+                    "g": np.random.random(),
+                    "b": np.random.random(),
+                    "a": 1.0
+                }
             }
             markers.append(marker)
         
         return {
-            "type": "Markers",
-            "markers": markers,
-            "timestamp": datetime.now().isoformat()
+            'topic': topic,
+            'type': 'generic',
+            'message_type': 'visualization_msgs/MarkerArray',
+            'data': {
+                "type": "Markers",
+                "markers": markers
+            },
+            'timestamp': time.time()
         }
     
-    def _generate_grid(self) -> Dict[str, Any]:
+    def _generate_grid(self, topic: str) -> Dict[str, Any]:
         """生成网格数据"""
         return {
-            "type": "Grid",
-            "size": 10,
-            "divisions": 10,
-            "timestamp": datetime.now().isoformat()
+            'topic': topic,
+            'type': 'generic',
+            'message_type': 'nav_msgs/OccupancyGrid',
+            'data': {
+                "type": "Grid",
+                "size": 10,
+                "divisions": 10
+            },
+            'timestamp': time.time()
         }
     
-    def _generate_pose(self) -> Dict[str, Any]:
+    def _generate_pose(self, topic: str) -> Dict[str, Any]:
         """生成位姿数据"""
         return {
-            "type": "Pose",
-            "position": [np.random.uniform(-2, 2), np.random.uniform(-2, 2), 0],
-            "orientation": [0, 0, np.random.uniform(-np.pi, np.pi)],
-            "timestamp": datetime.now().isoformat()
+            'topic': topic,
+            'type': 'generic',
+            'message_type': 'geometry_msgs/PoseStamped',
+            'data': {
+                "type": "Pose",
+                "pose": {
+                    "position": {
+                        "x": np.random.uniform(-2, 2),
+                        "y": np.random.uniform(-2, 2),
+                        "z": 0
+                    },
+                    "orientation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": np.random.uniform(-np.pi, np.pi),
+                        "w": 1
+                    }
+                }
+            },
+            'timestamp': time.time()
         }
