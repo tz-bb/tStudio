@@ -123,8 +123,9 @@ function MainView() {
           camera={{ position: [10, 10, 10], fov: 60 }}
           style={{ background: '#1a1a1a' }}
         >
-          <ambientLight intensity={0.4} />
-          <directionalLight position={[10, 10, 5]} intensity={1} />
+          <ambientLight intensity={0.6} />
+          <directionalLight position={[15, 15, 5]} intensity={1} />
+          <directionalLight position={[-15, -15, 5]} intensity={1} />
           <Scene3D data={sceneData} />
           <Grid args={[20, 20]} />
           <OrbitControls enablePan={true} enableZoom={true} enableRotate={true} />
