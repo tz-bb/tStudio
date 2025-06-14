@@ -6,7 +6,7 @@ dev:
 
 dev-frontend:
 	@echo "Starting frontend..."
-	@cd frontend && npm run dev
+	@cd frontend && npm start
 
 dev-backend:
 	@echo "Starting backend..."

@@ -6,6 +6,7 @@ import TopicPanel from './TopicPanel';
 import Scene3D from './Scene3D';
 import WebSocketManager from '../services/WebSocketManager';
 import './MainView.css';
+import TextDataPanel from './TextDataPanel';
 
 function MainView() {
   const [connectionStatus, setConnectionStatus] = useState({
@@ -41,10 +42,9 @@ function MainView() {
     });
     
     wsManager.on('data_update', (data) => {
-      console.log('[MainView] 收到数据更新:', data);
       setSceneData(prev => ({
         ...prev,
-        [data.topic]: data.data
+        [data.topic]: data
       }));
       addDebugInfo(`收到话题数据: ${data.topic}`);
     });
@@ -54,10 +54,26 @@ function MainView() {
       addDebugInfo(`话题订阅成功: ${data.topic}`, 'success');
     });
 
+    // 添加话题取消订阅事件监听器
+    wsManager.on('topic_unsubscribed', (data) => {
+      console.log('[MainView] 话题取消订阅:', data.topic);
+      // 从 sceneData 中删除对应的话题数据
+      setSceneData(prev => {
+        const newSceneData = { ...prev };
+        delete newSceneData[data.topic];
+        return newSceneData;
+      });
+      addDebugInfo(`话题取消订阅: ${data.topic}`, 'warning');
+    });
+
     // WebSocket连接状态监听
     wsManager.on('websocket_connected', (data) => {
       setWsStatus('connected');
       addDebugInfo('WebSocket连接成功', 'success');
+    });
+
+    wsManager.on('heartbeat', () => {
+      addDebugInfo('收到心跳响应');
     });
 
     wsManager.on('websocket_disconnected', (data) => {
@@ -81,7 +97,6 @@ function MainView() {
     // 定期检查WebSocket状态
     const statusInterval = setInterval(() => {
       const status = wsManager.getStatus();
-      console.log('[MainView] WebSocket状态检查:', status);
     }, 10000);
 
     return () => {
@@ -117,6 +132,8 @@ function MainView() {
           connectionStatus={connectionStatus}
           wsManager={wsManager}
         />
+        {/* 新增文本数据面板 */}
+        {/* <TextDataPanel sceneData={sceneData} /> */}
       </div>
       <div className="canvas-container">
         <Canvas

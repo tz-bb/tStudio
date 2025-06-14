@@ -31,10 +31,8 @@ class WebSocketManager {
       };
       
       this.ws.onmessage = (event) => {
-        console.log('[WebSocket] 📨 收到消息:', event.data);
         try {
           const message = JSON.parse(event.data);
-          console.log('[WebSocket] 📋 解析后的消息:', message);
           this.emit(message.type, message.data || message);
         } catch (error) {
           console.error('[WebSocket] ❌ 消息解析失败:', error, '原始数据:', event.data);
@@ -132,8 +130,6 @@ class WebSocketManager {
   }
 
   emit(event, data) {
-    console.log(`[WebSocket] 📡 触发事件: ${event}`, data);
-    console.log(`listeners : ${this.listeners[event]}`);
     if (this.listeners[event]) {
       this.listeners[event].forEach(callback => {
         try {
@@ -150,7 +146,6 @@ class WebSocketManager {
   send(data) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       const jsonData = JSON.stringify(data);
-      console.log('[WebSocket] 📤 发送消息:', jsonData);
       this.ws.send(jsonData);
       return true;
     } else {

@@ -47,7 +47,8 @@ class MockAdapter(BaseAdapter):
             {"name": "/point_cloud", "type": "sensor_msgs/PointCloud2"},
             {"name": "/markers", "type": "visualization_msgs/MarkerArray"},
             {"name": "/grid", "type": "nav_msgs/OccupancyGrid"},
-            {"name": "/robot_pose", "type": "geometry_msgs/PoseStamped"}
+            {"name": "/robot_pose", "type": "geometry_msgs/PoseStamped"},
+            {"name": "/text_test", "type": "std_msgs/String"}
         ]
     
     async def subscribe_topic(self, topic: str, message_type: str = None) -> bool:
@@ -98,6 +99,8 @@ class MockAdapter(BaseAdapter):
             return self._generate_grid(topic)
         elif topic == "/robot_pose":
             return self._generate_pose(topic)
+        elif topic == "/text_test":
+            return self._generate_text(topic)
         else:
             return {
                 'topic': topic,
@@ -196,6 +199,18 @@ class MockAdapter(BaseAdapter):
                         "w": 1
                     }
                 }
+            },
+            'timestamp': time.time()
+        }
+
+    def _generate_text(self, topic: str) -> Dict[str, Any]:
+        """生成文本数据"""
+        return {
+            'topic': topic,
+            'type': 'generic',
+            'message_type': 'std_msgs/String',
+            'data': {
+                "data": "Hello, World!"
             },
             'timestamp': time.time()
         }

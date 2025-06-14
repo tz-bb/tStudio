@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+import { initializePlugins } from './plugins';
 
 function PointCloud({ data }) {
   const points = useMemo(() => {
@@ -242,20 +243,45 @@ function IMUVisualization({ data }) {
 }
 
 function Scene3D({ data }) {
-  console.log('Scene3D收到的data:', data);
+  const [pluginManager, setPluginManager] = useState(null);
+  
+  useEffect(() => {
+    // 初始化插件系统
+    const manager = initializePlugins();
+    setPluginManager(manager);
+    
+    // 清理函数
+    return () => {
+      manager.destroy();
+    };
+  }, []);
+  
+  // 监听数据变化，清理不再存在的topic实例
+  useEffect(() => {
+    if (!pluginManager) return;
+    
+    const currentTopics = new Set(Object.keys(data));
+    const existingTopics = new Set(pluginManager.messageInstances.keys());
+    
+    // 移除不再存在的topic实例
+    for (const topic of existingTopics) {
+      if (!currentTopics.has(topic)) {
+        pluginManager.removeInstance(topic);
+      }
+    }
+  }, [data, pluginManager]);
+  
+  if (!pluginManager) {
+    return <group />; // 插件系统未初始化时显示空组
+  }
+  
   return (
     <group>
-      {/* 渲染点云 */}
-      {data['/point_cloud'] && <PointCloud data={data['/point_cloud']} />}
-      
-      {/* 渲染标记 */}
-      {data['/markers'] && <Markers data={data['/markers']} />}
-      
-      {/* 渲染机器人位姿 */}
-      {data['/robot_pose'] && <RobotPose data={data['/robot_pose']} />}
-      
-      {/* 渲染 IMU 数据 */}
-      {data['/imu'] && <IMUVisualization data={data['/imu']} />}
+      {/* 动态渲染所有话题数据 - 每个topic都有独立的插件实例 */}
+      {Object.entries(data).map(([topic, topicData]) => {
+        const renderedComponent = pluginManager.render(topic, topicData);
+        return renderedComponent;
+      })}
     </group>
   );
 }

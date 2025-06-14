@@ -181,109 +181,16 @@ class ROSAdapter(BaseAdapter):
     def _convert_ros_message(self, topic: str, message: dict, message_type: str) -> Optional[Dict[str, Any]]:
         """转换ROS消息为统一格式"""
         try:
-            # if message_type == 'sensor_msgs/PointCloud2':
-            #     return self._convert_pointcloud2(message)
-            # elif message_type == 'visualization_msgs/MarkerArray':
-            #     return self._convert_marker_array(message)
-            # elif message_type == 'geometry_msgs/PoseStamped':
-            #     return self._convert_pose_stamped(message)
-            # elif message_type == 'nav_msgs/OccupancyGrid':
-            #     return self._convert_occupancy_grid(message)
-            # else:
-            # 通用转换
             return {
                 'topic': topic,
                 'type': 'generic',
                 'message_type': message_type,
                 'data': message,
-                'timestamp': time.time()  # 修复：使用 time.time() 替代 asyncio.get_event_loop().time()
+                'timestamp': time.time()
             }
-                
         except Exception as e:
             print(f"Error converting ROS message: {e}")
             return None
-    
-    def _convert_pointcloud2(self, message: dict) -> Dict[str, Any]:
-        """转换PointCloud2消息"""
-        # 简化的点云转换（实际实现需要解析二进制数据）
-        return {
-            'topic': '/point_cloud',
-            'type': 'PointCloud',
-            'enabled': True,
-            'color': '#ff0000',
-            'size': 0.1,
-            'data': [],  # 这里需要实际解析点云数据
-            'timestamp': time.time()  # 修复：使用 time.time() 替代 asyncio.get_event_loop().time()
-        }
-    
-    def _convert_marker_array(self, message: dict) -> Dict[str, Any]:
-        """转换MarkerArray消息"""
-        markers = []
-        if 'markers' in message:
-            for marker in message['markers']:
-                converted_marker = {
-                    'id': marker.get('id', 0),
-                    'position': [
-                        marker.get('pose', {}).get('position', {}).get('x', 0),
-                        marker.get('pose', {}).get('position', {}).get('y', 0),
-                        marker.get('pose', {}).get('position', {}).get('z', 0)
-                    ],
-                    'rotation': [
-                        marker.get('pose', {}).get('orientation', {}).get('x', 0),
-                        marker.get('pose', {}).get('orientation', {}).get('y', 0),
-                        marker.get('pose', {}).get('orientation', {}).get('z', 0)
-                    ],
-                    'scale': [
-                        marker.get('scale', {}).get('x', 1),
-                        marker.get('scale', {}).get('y', 1),
-                        marker.get('scale', {}).get('z', 1)
-                    ],
-                    'type': 'cube'  # 简化处理
-                }
-                markers.append(converted_marker)
-        
-        return {
-            'topic': '/markers',
-            'type': 'Markers',
-            'enabled': True,
-            'color': '#00ff00',
-            'scale': 1.0,
-            'data': markers,
-            'timestamp': time.time()  # 修复：使用 time.time() 替代 asyncio.get_event_loop().time()
-        }
-    
-    def _convert_pose_stamped(self, message: dict) -> Dict[str, Any]:
-        """转换PoseStamped消息"""
-        pose = message.get('pose', {})
-        position = pose.get('position', {})
-        
-        return {
-            'topic': '/robot_pose',
-            'type': 'Pose',
-            'enabled': True,
-            'color': '#0000ff',
-            'data': {
-                'position': [position.get('x', 0), position.get('y', 0), position.get('z', 0)],
-                'orientation': [
-                    pose.get('orientation', {}).get('x', 0),
-                    pose.get('orientation', {}).get('y', 0),
-                    pose.get('orientation', {}).get('z', 0),
-                    pose.get('orientation', {}).get('w', 1)
-                ]
-            },
-            'timestamp': time.time()  # 修复：使用 time.time() 替代 asyncio.get_event_loop().time()
-        }
-    
-    def _convert_occupancy_grid(self, message: dict) -> Dict[str, Any]:
-        """转换OccupancyGrid消息"""
-        return {
-            'topic': '/grid',
-            'type': 'Grid',
-            'enabled': True,
-            'color': '#888888',
-            'data': message,
-            'timestamp': time.time()  # 修复：使用 time.time() 替代 asyncio.get_event_loop().time()
-        }
     
     async def _call_service_async(self, service, request):
         """异步调用ROS服务"""
