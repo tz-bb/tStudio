@@ -49,9 +49,9 @@ export class PointCloudPlugin extends VisualizationPlugin {
     return type === "sensor_msgs/PointCloud2"
   }
   
-  render(topic, data) {
+  render(topic, type, data) {
     console.log(`PointCloudPlugin rendering topic: ${topic}, data:`, data);  // 添加调试日志
-    return <PointCloud key={key} data={data} />;
+    return <PointCloud data={data} />;
   }
 }
 

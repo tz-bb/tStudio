@@ -195,9 +195,9 @@ export class ImuPlugin extends VisualizationPlugin {
            ));
   }
   
-  render(topic, data, key) {
+  render(topic, type, data) {
     console.log(`ImuPlugin rendering topic: ${topic}, data:`, data);
-    return <ImuVisualization key={key} data={data} />;
+    return <ImuVisualization data={data} />;
   }
 }
 

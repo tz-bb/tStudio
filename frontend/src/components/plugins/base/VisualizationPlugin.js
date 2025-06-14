@@ -126,7 +126,7 @@ export class VisualizationPluginManager {
     }
     
     try {
-      return pluginInstance.render(topic, data.data);
+      return pluginInstance.render(topic, data.message_type, data.data);
     } catch (error) {
       console.error(`Plugin ${pluginInstance.name} render error:`, error);
       return null;

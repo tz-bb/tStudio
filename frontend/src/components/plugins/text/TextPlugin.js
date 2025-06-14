@@ -37,8 +37,7 @@ export class TextPlugin extends VisualizationPlugin {
     return type === 'std_msgs/String'
   }
   
-  render(topic, data) {
-    console.log(`TextPlugin rendering topic: ${topic}, data:`, data);
+  render(topic, type, data) {
     return <TextVisualization data={data} topic={topic} />;
   }
 }

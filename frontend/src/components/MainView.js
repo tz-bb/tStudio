@@ -34,61 +34,68 @@ function MainView() {
   useEffect(() => {
     console.log('[MainView] 组件初始化，设置WebSocket事件监听');
     
-    // 设置WebSocket事件监听
-    wsManager.on('connection_status', (data) => {
+    // 定义事件处理函数
+    const handleConnectionStatus = (data) => {
       console.log('[MainView] 收到连接状态更新:', data);
       setConnectionStatus(data);
       addDebugInfo(`连接状态更新: ${data.connected ? '已连接' : '未连接'}`);
-    });
+    };
     
-    wsManager.on('data_update', (data) => {
+    const handleDataUpdate = (data) => {
       setSceneData(prev => ({
         ...prev,
         [data.topic]: data
       }));
       addDebugInfo(`收到话题数据: ${data.topic}`);
-    });
+    };
     
-    wsManager.on('topic_subscribed', (data) => {
-      console.log('[MainView] 话题订阅成功:', data.topic);
+    const handleTopicSubscribed = (data) => {
       addDebugInfo(`话题订阅成功: ${data.topic}`, 'success');
-    });
+    };
 
-    // 添加话题取消订阅事件监听器
-    wsManager.on('topic_unsubscribed', (data) => {
+    const handleTopicUnsubscribed = (data) => {
       console.log('[MainView] 话题取消订阅:', data.topic);
-      // 从 sceneData 中删除对应的话题数据
       setSceneData(prev => {
         const newSceneData = { ...prev };
         delete newSceneData[data.topic];
         return newSceneData;
       });
       addDebugInfo(`话题取消订阅: ${data.topic}`, 'warning');
-    });
+    };
 
-    // WebSocket连接状态监听
-    wsManager.on('websocket_connected', (data) => {
+    const handleWebSocketConnected = (data) => {
       setWsStatus('connected');
       addDebugInfo('WebSocket连接成功', 'success');
-    });
+    };
 
-    wsManager.on('heartbeat', () => {
+    const handleHeartbeat = () => {
       addDebugInfo('收到心跳响应');
-    });
+    };
 
-    wsManager.on('websocket_disconnected', (data) => {
+    const handleWebSocketDisconnected = (data) => {
       setWsStatus('disconnected');
       addDebugInfo(`WebSocket连接断开: ${data.reason}`, 'warning');
-    });
+    };
 
-    wsManager.on('websocket_error', (data) => {
+    const handleWebSocketError = (data) => {
       setWsStatus('error');
       addDebugInfo(`WebSocket错误: ${data.error}`, 'error');
-    });
+    };
 
-    wsManager.on('websocket_max_reconnect_reached', () => {
+    const handleMaxReconnectReached = () => {
       addDebugInfo('WebSocket重连次数达到上限', 'error');
-    });
+    };
+    
+    // 注册事件监听器
+    wsManager.on('connection_status', handleConnectionStatus);
+    wsManager.on('data_update', handleDataUpdate);
+    wsManager.on('topic_subscribed', handleTopicSubscribed);
+    wsManager.on('topic_unsubscribed', handleTopicUnsubscribed);
+    wsManager.on('websocket_connected', handleWebSocketConnected);
+    wsManager.on('heartbeat', handleHeartbeat);
+    wsManager.on('websocket_disconnected', handleWebSocketDisconnected);
+    wsManager.on('websocket_error', handleWebSocketError);
+    wsManager.on('websocket_max_reconnect_reached', handleMaxReconnectReached);
 
     // 连接WebSocket
     addDebugInfo('正在连接WebSocket...');
@@ -101,6 +108,18 @@ function MainView() {
 
     return () => {
       console.log('[MainView] 组件卸载，清理WebSocket连接');
+      
+      // 移除所有事件监听器
+      wsManager.off('connection_status', handleConnectionStatus);
+      wsManager.off('data_update', handleDataUpdate);
+      wsManager.off('topic_subscribed', handleTopicSubscribed);
+      wsManager.off('topic_unsubscribed', handleTopicUnsubscribed);
+      wsManager.off('websocket_connected', handleWebSocketConnected);
+      wsManager.off('heartbeat', handleHeartbeat);
+      wsManager.off('websocket_disconnected', handleWebSocketDisconnected);
+      wsManager.off('websocket_error', handleWebSocketError);
+      wsManager.off('websocket_max_reconnect_reached', handleMaxReconnectReached);
+      
       clearInterval(statusInterval);
       wsManager.disconnect();
     };
