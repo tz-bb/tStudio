@@ -1,27 +1,87 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ApiService from '../services/ApiService';
 import './ConnectionPanel.css';
 
 function ConnectionPanel({ connectionStatus, wsManager }) {
   const [adapters, setAdapters] = useState([]);
+  const [adapterConfigs, setAdapterConfigs] = useState({});
   const [selectedAdapter, setSelectedAdapter] = useState('mock');
-  const [config, setConfig] = useState({
-    host: 'localhost',
-    port: 9090,
-    update_interval: 0.1
-  });
+  const [config, setConfig] = useState({});
   const [loading, setLoading] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     loadAdapters();
   }, []);
+
+  useEffect(() => {
+    // 当选择的适配器改变时，重置配置为默认值
+    if (selectedAdapter && adapterConfigs[selectedAdapter]) {
+      const schema = adapterConfigs[selectedAdapter].config_schema;
+      const defaultConfig = {};
+      schema.fields.forEach(field => {
+        defaultConfig[field.name] = field.default;
+      });
+      setConfig(defaultConfig);
+    }
+  }, [selectedAdapter, adapterConfigs]);
 
   const loadAdapters = async () => {
     try {
       const response = await ApiService.getAdapters();
       setAdapters(response.adapters);
+      setAdapterConfigs(response.adapter_configs);
+      
+      // 设置默认选择的适配器
+      if (response.adapters.length > 0) {
+        setSelectedAdapter(response.adapters[0]);
+      }
     } catch (error) {
       console.error('Failed to load adapters:', error);
+    }
+  };
+
+  const handleConfigChange = (fieldName, value) => {
+    setConfig(prev => ({
+      ...prev,
+      [fieldName]: value
+    }));
+  };
+
+  const renderConfigField = (field) => {
+    const value = config[field.name] || field.default;
+    
+    switch (field.type) {
+      case 'text':
+        return (
+          <input
+            type="text"
+            value={value}
+            placeholder={field.placeholder}
+            onChange={(e) => handleConfigChange(field.name, e.target.value)}
+            required={field.required}
+          />
+        );
+      case 'number':
+        return (
+          <input
+            type="number"
+            value={value}
+            min={field.min}
+            max={field.max}
+            step={field.step}
+            onChange={(e) => handleConfigChange(field.name, parseFloat(e.target.value))}
+            required={field.required}
+          />
+        );
+      default:
+        return (
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => handleConfigChange(field.name, e.target.value)}
+            required={field.required}
+          />
+        );
     }
   };
 
@@ -48,6 +108,8 @@ function ConnectionPanel({ connectionStatus, wsManager }) {
     }
   };
 
+  const currentAdapterConfig = adapterConfigs[selectedAdapter];
+
   return (
     <div className="connection-panel">
       <h3>数据源连接</h3>
@@ -57,7 +119,9 @@ function ConnectionPanel({ connectionStatus, wsManager }) {
           {connectionStatus.connected ? '已连接' : '未连接'}
         </span>
         {connectionStatus.connected && (
-          <span className="adapter-name">{connectionStatus.adapter}</span>
+          <span className="adapter-name">
+            {adapterConfigs[connectionStatus.adapter]?.display_name || connectionStatus.adapter}
+          </span>
         )}
       </div>
 
@@ -70,43 +134,28 @@ function ConnectionPanel({ connectionStatus, wsManager }) {
               onChange={(e) => setSelectedAdapter(e.target.value)}
             >
               {adapters.map(adapter => (
-                <option key={adapter} value={adapter}>{adapter}</option>
+                <option key={adapter} value={adapter}>
+                  {adapterConfigs[adapter]?.display_name || adapter}
+                </option>
               ))}
             </select>
           </div>
 
-          {selectedAdapter === 'ros1' && (
-            <>
-              <div className="form-group">
-                <label>主机:</label>
-                <input 
-                  type="text" 
-                  value={config.host} 
-                  onChange={(e) => setConfig({...config, host: e.target.value})}
-                />
-              </div>
-              <div className="form-group">
-                <label>端口:</label>
-                <input 
-                  type="number" 
-                  value={config.port} 
-                  onChange={(e) => setConfig({...config, port: parseInt(e.target.value)})}
-                />
-              </div>
-            </>
-          )}
-
-          {selectedAdapter === 'mock' && (
-            <div className="form-group">
-              <label>更新间隔 (秒):</label>
-              <input 
-                type="number" 
-                step="0.1" 
-                value={config.update_interval} 
-                onChange={(e) => setConfig({...config, update_interval: parseFloat(e.target.value)})}
-              />
+          {currentAdapterConfig?.description && (
+            <div className="adapter-description">
+              <small>{currentAdapterConfig.description}</small>
             </div>
           )}
+
+          {currentAdapterConfig?.config_schema?.fields?.map(field => (
+            <div key={field.name} className="form-group">
+              <label>
+                {field.label}
+                {field.required && <span className="required">*</span>}
+              </label>
+              {renderConfigField(field)}
+            </div>
+          ))}
 
           <button 
             onClick={handleConnect} 

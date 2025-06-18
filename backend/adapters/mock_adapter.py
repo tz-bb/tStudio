@@ -1,23 +1,59 @@
 import asyncio
 import numpy as np
-import time  # 添加 time 模块导入
+import time
 from typing import Dict, Any, List
 from .base_adapter import BaseAdapter
 from datetime import datetime
 
 class MockAdapter(BaseAdapter):
-    """模拟数据适配器"""
+    """模拟数据适配器 - 用于测试和演示"""
     
     def __init__(self):
         super().__init__()
         self.update_task = None
-        self.update_interval = 0.1  # 100ms
+        self.update_interval = 0.1
+
+        self.__text_count = 0
+    
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        return {
+            "fields": [
+                {
+                    "name": "update_interval",
+                    "type": "number",
+                    "label": "更新间隔 (秒)",
+                    "default": 0.1,
+                    "required": True,
+                    "min": 0.01,
+                    "max": 10.0,
+                    "step": 0.01
+                },
+                {
+                    "name": "enable_batching",
+                    "type": "boolean",
+                    "label": "启用批处理",
+                    "default": False,
+                    "required": False
+                }
+            ]
+        }
+    
+    @classmethod
+    def get_display_name(cls) -> str:
+        return "模拟数据源"
     
     async def connect(self, config: Dict[str, Any]) -> bool:
         """连接到模拟数据源"""
         try:
             self.config = config
             self.update_interval = config.get('update_interval', 0.1)
+            
+            # 根据配置决定是否启用批处理
+            if config.get('enable_batching', False):
+                self.enable_message_batching(10)  # 10Hz批处理
+                await self._start_batch_update_task()
+            
             self.is_connected = True
             
             # 启动数据更新任务
@@ -33,9 +69,22 @@ class MockAdapter(BaseAdapter):
         """断开连接"""
         try:
             self.is_connected = False
+            
+            # 停止更新任务
             if self.update_task and not self.update_task.done():
                 self.update_task.cancel()
+                try:
+                    await self.update_task
+                except asyncio.CancelledError:
+                    pass
+                self.update_task = None
+            
+            # 停止批处理任务
+            await self._stop_batch_update_task()
+            
+            # 清理订阅
             self.subscribed_topics.clear()
+            
             return True
         except Exception as e:
             print(f"Mock adapter disconnection error: {e}")
@@ -80,7 +129,7 @@ class MockAdapter(BaseAdapter):
                 # 为每个订阅的话题生成数据
                 for topic in self.subscribed_topics.keys():
                     data = self._generate_mock_data(topic)
-                    await self._notify_callbacks(topic, data)
+                    await self._buffer_message(topic, data)
                 
                 await asyncio.sleep(self.update_interval)
             except asyncio.CancelledError:
@@ -202,15 +251,16 @@ class MockAdapter(BaseAdapter):
             },
             'timestamp': time.time()
         }
-
+    
     def _generate_text(self, topic: str) -> Dict[str, Any]:
+        self.__text_count += 1
         """生成文本数据"""
         return {
             'topic': topic,
             'type': 'generic',
             'message_type': 'std_msgs/String',
             'data': {
-                "data": "Hello, World!"
+                "data": f"Hello, World!,{self.__text_count}"
             },
             'timestamp': time.time()
         }

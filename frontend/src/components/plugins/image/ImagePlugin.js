@@ -187,35 +187,7 @@ export class ImagePlugin extends VisualizationPlugin {
 
     canHandle(topic, type, data) {
         // 检查是否为sensor_msgs/Image类型
-        if (type && type.includes('sensor_msgs/Image')) {
-            return true;
-        }
-
-        // 检查话题名称是否包含image相关关键词
-        if (topic && (topic.includes('/image') || topic.includes('/camera'))) {
-            return true;
-        }
-
-        // 检查数据结构是否符合sensor_msgs/Image格式
-        if (data && typeof data === 'object') {
-            const hasRequiredFields = (
-                data.header &&
-                typeof data.width === 'number' &&
-                typeof data.height === 'number' &&
-                typeof data.encoding === 'string' &&
-                data.data
-            );
-
-            // 检查header结构
-            const hasValidHeader = (
-                data.header.stamp &&
-                typeof data.header.frame_id === 'string'
-            );
-
-            return hasRequiredFields && hasValidHeader;
-        }
-
-        return false;
+        return type === "sensor_msgs/Image"
     }
 
     render(topic, type, data) {

@@ -1,24 +1,56 @@
 import asyncio
-import time  # 添加这个导入
-from typing import Dict, Any, List, Optional, Callable
+import time
+from typing import Dict, Any, List, Optional
 from .base_adapter import BaseAdapter
 import roslibpy
 
 class ROSAdapter(BaseAdapter):
-    """ROS1 数据适配器"""
+    """ROS1 数据适配器 - 通过 rosbridge 连接到 ROS1 系统"""
     
     def __init__(self):
         super().__init__()
         self.ros = None
         self.listeners = {}
-        self._main_loop = None  # 添加这行
+        self._main_loop = None
         self.service_clients = {}
         
+        # 默认启用批处理，30Hz频率
+        self.enable_message_batching(30)
+    
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        return {
+            "fields": [
+                {
+                    "name": "host",
+                    "type": "text",
+                    "label": "ROS Bridge 主机地址",
+                    "default": "localhost",
+                    "required": True,
+                    "placeholder": "例如: localhost 或 192.168.1.100"
+                },
+                {
+                    "name": "port",
+                    "type": "number",
+                    "label": "ROS Bridge 端口",
+                    "default": 9090,
+                    "required": True,
+                    "min": 1,
+                    "max": 65535
+                }
+            ]
+        }
+    
+    @classmethod
+    def get_display_name(cls) -> str:
+        return "ROS1 Bridge"
+    
     async def connect(self, config: Dict[str, Any]) -> bool:
         try:
             # 保存主事件循环的引用
             self._main_loop = asyncio.get_event_loop()
             
+            # 创建ROS连接
             host = config.get('host', 'localhost')
             port = config.get('port', 9090)
             
@@ -36,10 +68,16 @@ class ROSAdapter(BaseAdapter):
             await asyncio.sleep(1)
             
             if self.ros.is_connected:
-                self.config = config
                 self.is_connected = True
+                self.config = config
+                
+                # 启动批处理任务
+                await self._start_batch_update_task()
+                
+                print(f"Connected to ROS Bridge at {host}:{port}")
                 return True
             else:
+                print(f"Failed to connect to ROS Bridge at {host}:{port}")
                 return False
                 
         except Exception as e:
@@ -57,6 +95,9 @@ class ROSAdapter(BaseAdapter):
             if self.ros and self.ros.is_connected:
                 self.ros.close()
             
+            # 停止批处理任务
+            await self._stop_batch_update_task()
+            
             self.is_connected = False
             return True
             
@@ -65,42 +106,75 @@ class ROSAdapter(BaseAdapter):
             return False
     
     async def get_available_topics(self) -> List[Dict[str, str]]:
-        """获取ROS话题列表"""
-        if not self.ros or not self.ros.is_connected:
+        """获取可用话题列表"""
+        if not self.is_connected or not self.ros:
             return []
         
         try:
-            # 创建服务客户端获取话题列表
-            service = roslibpy.Service(self.ros, '/rosapi/topics', 'rosapi/Topics')
+            # 获取话题列表
+            future = asyncio.Future()
             
-            # 异步调用服务
-            topics_response = await self._call_service_async(service, {})
+            def callback(topics):
+                if not future.done():
+                    future.set_result(topics)
             
-            if topics_response and 'topics' in topics_response:
-                topics = []
-                for topic_name in topics_response['topics']:
+            def error_callback(error):
+                if not future.done():
+                    future.set_exception(Exception(error))
+            
+            # 调用ROS服务获取话题列表
+            topics_service = roslibpy.Service(self.ros, '/rosapi/topics', 'rosapi/Topics')
+            topics_service.call(roslibpy.ServiceRequest(), callback, error_callback)
+            
+            topics_response = await asyncio.wait_for(future, timeout=5.0)
+            
+            # 获取话题类型
+            result = []
+            for topic in topics_response.get('topics', []):
+                try:
                     # 获取话题类型
-                    type_service = roslibpy.Service(self.ros, '/rosapi/topic_type', 'rosapi/TopicType')
-                    type_response = await self._call_service_async(type_service, {'topic': topic_name})
+                    type_future = asyncio.Future()
                     
-                    topic_type = type_response.get('type', 'unknown') if type_response else 'unknown'
-                    topics.append({
-                        'name': topic_name,
+                    def type_callback(topic_type):
+                        if not type_future.done():
+                            type_future.set_result(topic_type)
+                    
+                    def type_error_callback(error):
+                        if not type_future.done():
+                            type_future.set_exception(Exception(error))
+                    
+                    type_service = roslibpy.Service(self.ros, '/rosapi/topic_type', 'rosapi/TopicType')
+                    type_service.call(
+                        roslibpy.ServiceRequest({'topic': topic}), 
+                        type_callback, 
+                        type_error_callback
+                    )
+                    
+                    topic_type_response = await asyncio.wait_for(type_future, timeout=2.0)
+                    topic_type = topic_type_response.get('type', 'unknown')
+                    
+                    result.append({
+                        'name': topic,
                         'type': topic_type
                     })
-                
-                return topics
+                    
+                except Exception as e:
+                    print(f"Error getting type for topic {topic}: {e}")
+                    result.append({
+                        'name': topic,
+                        'type': 'unknown'
+                    })
             
-            return []
+            return result
             
         except Exception as e:
-            print(f"Error getting ROS topics: {e}")
+            print(f"Error getting available topics: {e}")
             return []
     
     async def subscribe_topic(self, topic: str, message_type: str = None) -> bool:
-        """订阅ROS话题"""
-        if not self.ros or not self.ros.is_connected:
-            print(f"ROS not connected when trying to subscribe to {topic}")
+        """订阅话题"""
+        if not self.is_connected or not self.ros:
+            print(f"Cannot subscribe to {topic}: not connected")
             return False
         
         try:
@@ -108,57 +182,75 @@ class ROSAdapter(BaseAdapter):
             if topic in self.listeners:
                 await self.unsubscribe_topic(topic)
             
-            # 如果没有提供消息类型，尝试获取
+            # 如果没有提供消息类型，动态获取
             if not message_type:
-                print(f"Getting message type for topic: {topic}")
-                type_service = roslibpy.Service(self.ros, '/rosapi/topic_type', 'rosapi/TopicType')
-                type_response = await self._call_service_async(type_service, {'topic': topic})
-                
-                if type_response and 'type' in type_response:
-                    message_type = type_response['type']
-                    print(f"Found message type for {topic}: {message_type}")
-                else:
-                    print(f"Could not get message type for topic: {topic}, response: {type_response}")
-            
-            if not message_type:
-                print(f"Could not determine message type for topic: {topic}")
-                return False
-            
-            print(f"Creating listener for topic: {topic} with type: {message_type}")
+                try:
+                    future = asyncio.Future()
+                    
+                    def callback(response):
+                        if not future.done():
+                            future.set_result(response)
+                    
+                    def error_callback(error):
+                        if not future.done():
+                            future.set_exception(Exception(error))
+                    
+                    type_service = roslibpy.Service(self.ros, '/rosapi/topic_type', 'rosapi/TopicType')
+                    type_service.call(
+                        roslibpy.ServiceRequest({'topic': topic}), 
+                        callback, 
+                        error_callback
+                    )
+                    
+                    response = await asyncio.wait_for(future, timeout=5.0)
+                    message_type = response.get('type')
+                    
+                    if not message_type:
+                        print(f"Could not determine message type for topic {topic}")
+                        return False
+                        
+                except Exception as e:
+                    print(f"Error getting message type for {topic}: {e}")
+                    return False
             
             # 创建话题监听器
             listener = roslibpy.Topic(self.ros, topic, message_type)
             
             # 设置消息回调
-            listener.subscribe(lambda message: self._handle_ros_message(topic, message_type, message))
+            def message_callback(message):
+                self._handle_ros_message(topic, message_type, message)
             
+            listener.subscribe(message_callback)
+            
+            # 保存监听器和订阅信息
             self.listeners[topic] = listener
-            self.subscribed_topics[topic] = {
-                'type': message_type,
-                'subscribed_at': asyncio.get_event_loop().time()
-            }
+            self.subscribed_topics[topic] = message_type
             
-            print(f"Successfully subscribed to topic: {topic}")
+            print(f"Subscribed to topic: {topic} (type: {message_type})")
             return True
             
         except Exception as e:
             print(f"Error subscribing to topic {topic}: {e}")
-            import traceback
-            traceback.print_exc()
             return False
     
     async def unsubscribe_topic(self, topic: str) -> bool:
-        """取消订阅ROS话题"""
+        """取消订阅话题"""
         try:
             if topic in self.listeners:
+                # 取消订阅
                 self.listeners[topic].unsubscribe()
                 del self.listeners[topic]
-            
-            if topic in self.subscribed_topics:
-                del self.subscribed_topics[topic]
-            
-            return True
-            
+                
+                # 从订阅列表中移除
+                if topic in self.subscribed_topics:
+                    del self.subscribed_topics[topic]
+                
+                print(f"Unsubscribed from topic: {topic}")
+                return True
+            else:
+                print(f"Topic {topic} was not subscribed")
+                return False
+                
         except Exception as e:
             print(f"Error unsubscribing from topic {topic}: {e}")
             return False
@@ -166,13 +258,13 @@ class ROSAdapter(BaseAdapter):
     def _handle_ros_message(self, topic: str, message_type: str, message: dict):
         """处理ROS消息"""
         try:
-            # 转换ROS消息为tStudio格式
-            converted_data = self._convert_ros_message(topic, message, message_type)  # 修复：调整参数顺序
+            converted_data = self._convert_ros_message(topic, message, message_type)
             
             if converted_data and self._main_loop:
-                # 使用保存的主事件循环来调度异步任务
+                # 使用基类的缓冲方法
                 asyncio.run_coroutine_threadsafe(
-                    self._notify_callbacks(topic, converted_data), self._main_loop
+                    self._buffer_message(topic, converted_data), 
+                    self._main_loop
                 )
                 
         except Exception as e:
@@ -190,29 +282,6 @@ class ROSAdapter(BaseAdapter):
             }
         except Exception as e:
             print(f"Error converting ROS message: {e}")
-            return None
-    
-    async def _call_service_async(self, service, request):
-        """异步调用ROS服务"""
-        future = asyncio.Future()
-        
-        def callback(response):
-            if not future.done():
-                future.set_result(response)
-        
-        def error_callback(error):
-            if not future.done():
-                future.set_exception(Exception(error))
-        
-        try:
-            service.call(roslibpy.ServiceRequest(request), callback, error_callback)
-            # 增加超时时间到10秒
-            return await asyncio.wait_for(future, timeout=2.0)
-        except asyncio.TimeoutError:
-            print(f"Service call timeout for request: {request}")
-            return None
-        except Exception as e:
-            print(f"Service call error: {e}")
             return None
     
     def _on_connection(self):

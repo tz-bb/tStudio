@@ -42,6 +42,7 @@ function MainView() {
     };
     
     const handleDataUpdate = (data) => {
+      console.log("data_update in MainView : ",data)
       setSceneData(prev => ({
         ...prev,
         [data.topic]: data

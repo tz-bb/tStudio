@@ -56,10 +56,19 @@ class TopicSubscriptionRequest(BaseModel):
 # API路由
 @app.get("/api/adapters")
 async def get_available_adapters():
-    """获取可用的数据源适配器"""
+    """获取可用的数据源适配器及其配置信息"""
     return {
-        "adapters": data_source_manager.get_available_adapters()
+        "adapters": data_source_manager.get_available_adapters(),
+        "adapter_configs": data_source_manager.get_adapter_configs()
     }
+
+@app.get("/api/adapters/{adapter_name}/config")
+async def get_adapter_config(adapter_name: str):
+    """获取指定适配器的配置信息"""
+    config = data_source_manager.get_adapter_config(adapter_name)
+    if config is None:
+        raise HTTPException(status_code=404, detail="Adapter not found")
+    return config
 
 @app.post("/api/connection/connect")
 async def connect_to_adapter(request: ConnectionRequest):
