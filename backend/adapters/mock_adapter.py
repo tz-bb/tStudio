@@ -90,16 +90,6 @@ class MockAdapter(BaseAdapter):
             print(f"Mock adapter disconnection error: {e}")
             return False
     
-    async def get_available_topics(self) -> List[Dict[str, str]]:
-        """获取可用话题列表"""
-        return [
-            {"name": "/point_cloud", "type": "sensor_msgs/PointCloud2"},
-            {"name": "/markers", "type": "visualization_msgs/MarkerArray"},
-            {"name": "/grid", "type": "nav_msgs/OccupancyGrid"},
-            {"name": "/robot_pose", "type": "geometry_msgs/PoseStamped"},
-            {"name": "/text_test", "type": "std_msgs/String"}
-        ]
-    
     async def subscribe_topic(self, topic: str, message_type: str = None) -> bool:
         """订阅话题"""
         try:
@@ -138,6 +128,86 @@ class MockAdapter(BaseAdapter):
                 print(f"Mock adapter update error: {e}")
                 await asyncio.sleep(1)
     
+    # 在mock_adapter中添加TF数据生成
+    
+    def _generate_tf_data(self, topic: str) -> Dict[str, Any]:
+        """生成模拟TF数据"""
+        import math
+        
+        current_time = time.time()
+        
+        # 生成一些示例TF变换
+        transforms = [
+            {
+                "header": {
+                    "stamp": {
+                        "sec": int(current_time),
+                        "nsec": int((current_time % 1) * 1e9)
+                    },
+                    "frame_id": "base_link"
+                },
+                "child_frame_id": "laser_frame",
+                "transform": {
+                    "translation": {
+                        "x": 0.1,
+                        "y": 0.0,
+                        "z": 0.2
+                    },
+                    "rotation": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": math.sin(current_time * 0.5) * 0.1,
+                        "w": math.cos(current_time * 0.5) * 0.1
+                    }
+                }
+            },
+            {
+                "header": {
+                    "stamp": {
+                        "sec": int(current_time),
+                        "nsec": int((current_time % 1) * 1e9)
+                    },
+                    "frame_id": "base_link"
+                },
+                "child_frame_id": "camera_frame",
+                "transform": {
+                    "translation": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.5
+                    },
+                    "rotation": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0,
+                        "w": 1.0
+                    }
+                }
+            }
+        ]
+        
+        return {
+            'topic': topic,
+            'type': 'generic',
+            'message_type': 'tf2_msgs/TFMessage',
+            'data': {
+                'transforms': transforms
+            },
+            'timestamp': current_time
+        }
+    
+    # 在get_available_topics中添加
+    async def get_available_topics(self) -> List[Dict[str, str]]:
+        return [
+            {"name": "/point_cloud", "type": "sensor_msgs/PointCloud2"},
+            {"name": "/markers", "type": "visualization_msgs/MarkerArray"},
+            {"name": "/grid", "type": "nav_msgs/OccupancyGrid"},
+            {"name": "/robot_pose", "type": "geometry_msgs/PoseStamped"},
+            {"name": "/text_test", "type": "std_msgs/String"},
+            {"name": "/tf", "type": "tf2_msgs/TFMessage"}
+        ]
+    
+    # 在_generate_mock_data中添加处理
     def _generate_mock_data(self, topic: str) -> Dict[str, Any]:
         """生成模拟数据"""
         if topic == "/point_cloud":
@@ -150,6 +220,8 @@ class MockAdapter(BaseAdapter):
             return self._generate_pose(topic)
         elif topic == "/text_test":
             return self._generate_text(topic)
+        elif topic == "/tf":
+            return self._generate_tf_data(topic)
         else:
             return {
                 'topic': topic,

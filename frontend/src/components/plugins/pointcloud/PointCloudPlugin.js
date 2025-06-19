@@ -39,21 +39,22 @@ function PointCloud({ data }) {
   );
 }
 
-// 点云插件
+// 点云插件 - 支持TF
 export class PointCloudPlugin extends VisualizationPlugin {
   constructor() {
     super('PointCloud', 10, '1.0.0');
   }
   
   canHandle(topic, type, data) {
-    return type === "sensor_msgs/PointCloud2"
+    return type === "sensor_msgs/PointCloud2";
   }
   
   render(topic, type, data) {
-    console.log(`PointCloudPlugin rendering topic: ${topic}, data:`, data);  // 添加调试日志
-    return <PointCloud data={data} />;
+    // 使用TF支持的渲染
+    return this.renderWithTF(topic, type, data, 
+      <PointCloud data={data} />
+    );
   }
 }
 
-// 默认导出插件实例
 export default new PointCloudPlugin();

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { tfManager } from '../../../services/TFManager';
 
-// 可视化插件基类
 export class VisualizationPlugin {
   constructor(name, priority = 0, version = '1.0.0') {
     this.name = name;
@@ -8,23 +9,31 @@ export class VisualizationPlugin {
     this.version = version;
     this.enabled = true;
   }
-  
-  // 插件元数据
-  getMetadata() {
-    return {
-      name: this.name,
-      priority: this.priority,
-      version: this.version,
-      enabled: this.enabled
-    };
+
+  // 获取数据的frame信息
+  getFrameId(data) {
+    if (data.header && data.header.frame_id) {
+      return data.header.frame_id;
+    }
+    return 'base_link'; // 默认frame
   }
-  
-  // 检查是否可以处理该数据
+
+  // 创建带TF支持的渲染组件
+  renderWithTF(topic, type, data, children) {
+    const frameId = this.getFrameId(data);
+    const frameObject = tfManager.getFrameObject(frameId);
+    
+    return (
+      <TFFrame frameId={frameId} key={`${topic}-${frameId}`}>
+        {children}
+      </TFFrame>
+    );
+  }
+
   canHandle(topic, type, data) {
     throw new Error(`Plugin ${this.name}: canHandle method must be implemented`);
   }
-  
-  // 渲染组件
+
   render(topic, type, data) {
     throw new Error(`Plugin ${this.name}: render method must be implemented`);
   }
@@ -187,3 +196,38 @@ export class VisualizationPluginManager {
     console.log('Plugin manager destroyed');
   }
 }
+
+// TF Frame组件
+function TFFrame({ frameId, children }) {
+  const groupRef = useRef();
+  
+  useEffect(() => {
+    if (groupRef.current) {
+      const frameObject = tfManager.createFrameObject(frameId);
+      // 将Three.js对象的变换应用到React组件
+      groupRef.current.position.copy(frameObject.position);
+      groupRef.current.quaternion.copy(frameObject.quaternion);
+      groupRef.current.scale.copy(frameObject.scale);
+    }
+  }, [frameId]);
+
+  // 监听TF更新
+  useFrame(() => {
+    if (groupRef.current) {
+      const frameObject = tfManager.getFrameObject(frameId);
+      if (frameObject) {
+        groupRef.current.position.copy(frameObject.position);
+        groupRef.current.quaternion.copy(frameObject.quaternion);
+        groupRef.current.scale.copy(frameObject.scale);
+      }
+    }
+  });
+
+  return (
+    <group ref={groupRef} name={frameId}>
+      {children}
+    </group>
+  );
+}
+
+export { TFFrame };

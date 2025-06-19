@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid, Stats } from '@react-three/drei';
 import ConnectionPanel from './ConnectionPanel';
@@ -7,8 +7,10 @@ import Scene3D from './Scene3D';
 import WebSocketManager from '../services/WebSocketManager';
 import './MainView.css';
 import TextDataPanel from './TextDataPanel';
+import TFPanel from './TFPanel';
+import { tfManager } from '../services/TFManager';
 
-function MainView() {
+const MainView = () => {
   const [connectionStatus, setConnectionStatus] = useState({
     connected: false,
     adapter: null,
@@ -17,6 +19,8 @@ function MainView() {
   });
   const [topics, setTopics] = useState([]);
   const [sceneData, setSceneData] = useState({});
+  const [subscribedTopics, setSubscribedTopics] = useState(new Set());
+  const subscribedTopicsRef = useRef(subscribedTopics);
   const [wsManager] = useState(() => new WebSocketManager());
   const [wsStatus, setWsStatus] = useState('disconnected');
   const [debugInfo, setDebugInfo] = useState([]);
@@ -30,6 +34,9 @@ function MainView() {
     ]);
     console.log(`[MainView] ${message}`);
   };
+  useEffect(() => {
+    subscribedTopicsRef.current = subscribedTopics;
+  }, [subscribedTopics]);
 
   useEffect(() => {
     console.log('[MainView] 组件初始化，设置WebSocket事件监听');
@@ -42,7 +49,18 @@ function MainView() {
     };
     
     const handleDataUpdate = (data) => {
-      console.log("data_update in MainView : ",data)
+      // 检查是否为TF数据
+      if (data.message_type === 'tf2_msgs/TFMessage') {
+        tfManager.updateTF(data.data);
+        return;
+      }
+      
+      // 检查topic是否仍在订阅状态
+      if (!subscribedTopicsRef.current.has(data.topic)) {
+        console.log(`忽略已取消订阅topic的数据: ${data.topic}`);
+        return;
+      }
+      
       setSceneData(prev => ({
         ...prev,
         [data.topic]: data
@@ -51,16 +69,26 @@ function MainView() {
     };
     
     const handleTopicSubscribed = (data) => {
+      setSubscribedTopics(prev => new Set([...prev, data.topic])); // 添加到订阅列表
       addDebugInfo(`话题订阅成功: ${data.topic}`, 'success');
     };
 
     const handleTopicUnsubscribed = (data) => {
       console.log('[MainView] 话题取消订阅:', data.topic);
+      // 先从订阅列表中移除
+      setSubscribedTopics(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(data.topic);
+        return newSet;
+      });
+      
+      // 然后清空数据
       setSceneData(prev => {
         const newSceneData = { ...prev };
         delete newSceneData[data.topic];
         return newSceneData;
       });
+      
       addDebugInfo(`话题取消订阅: ${data.topic}`, 'warning');
     };
 
@@ -86,6 +114,10 @@ function MainView() {
     const handleMaxReconnectReached = () => {
       addDebugInfo('WebSocket重连次数达到上限', 'error');
     };
+
+    const handleSystemMsg = (data) => {
+      addDebugInfo(`系统消息: ${data.message}`, 'info');
+    };
     
     // 注册事件监听器
     wsManager.on('connection_status', handleConnectionStatus);
@@ -97,6 +129,7 @@ function MainView() {
     wsManager.on('websocket_disconnected', handleWebSocketDisconnected);
     wsManager.on('websocket_error', handleWebSocketError);
     wsManager.on('websocket_max_reconnect_reached', handleMaxReconnectReached);
+    wsManager.on('system_message', handleSystemMsg);
 
     // 连接WebSocket
     addDebugInfo('正在连接WebSocket...');
@@ -120,6 +153,7 @@ function MainView() {
       wsManager.off('websocket_disconnected', handleWebSocketDisconnected);
       wsManager.off('websocket_error', handleWebSocketError);
       wsManager.off('websocket_max_reconnect_reached', handleMaxReconnectReached);
+      wsManager.off('system_message', handleSystemMsg);
       
       clearInterval(statusInterval);
       wsManager.disconnect();
@@ -152,6 +186,10 @@ function MainView() {
           connectionStatus={connectionStatus}
           wsManager={wsManager}
         />
+        
+        {/* 添加TF面板 */}
+        <TFPanel />
+        
         {/* 新增文本数据面板 */}
         {/* <TextDataPanel sceneData={sceneData} /> */}
       </div>
