@@ -143,6 +143,7 @@ async def unsubscribe_from_topic_by_query(topic: str = Query(...)):
 # 数据回调函数
 async def on_data_received(topic: str, data: Any):
     """数据接收回调"""
+    # print(f"[DEBUG] Broadcasting data for topic: {topic}") # <--- 添加这行
     await manager.broadcast({
         "type": "data_update",
         "topic": topic,

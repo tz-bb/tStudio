@@ -1,55 +1,78 @@
-import React, { useState, useEffect } from 'react';
-import { tfManager } from '../services/TFManager';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { tfManager } from '../services/TFManager'; // 仍然需要它来修改3D对象
 import './TFPanel.css';
 
-function TFPanel() {
-  const [frames, setFrames] = useState(new Map());
+// 渲染TF树的递归组件
+const FrameNode = React.memo(({ frameId, hierarchy, level, onSelect, selectedFrame }) => {
+  const children = useMemo(() => 
+    Array.from(hierarchy.entries())
+      .filter(([, parent]) => parent === frameId)
+      .map(([child]) => child),
+    [hierarchy, frameId]
+  );
+
+  return (
+    <div style={{ marginLeft: level * 20 }}>
+      <div 
+        className={`frame-item ${selectedFrame === frameId ? 'selected' : ''}`}
+        onClick={() => onSelect(frameId)}
+      >
+        📍 {frameId}
+      </div>
+      {children.map(child => (
+        <FrameNode 
+          key={child} 
+          frameId={child} 
+          hierarchy={hierarchy} 
+          level={level + 1} 
+          onSelect={onSelect} 
+          selectedFrame={selectedFrame} 
+        />
+      ))}
+    </div>
+  );
+});
+
+function TFPanel({ frames, hierarchy }) {
   const [selectedFrame, setSelectedFrame] = useState(null);
   const [manualTransform, setManualTransform] = useState({
     position: { x: 0, y: 0, z: 0 },
-    rotation: { x: 0, y: 0, z: 0 }
+    rotation: { x: 0, y: 0, z: 0, w: 1 }, // 使用四元数更准确
   });
 
+  // 当选择的frame变化时，更新面板上的显示值
   useEffect(() => {
-    const updateFrames = () => {
-      setFrames(new Map(tfManager.frames));
-    };
+    if (selectedFrame) {
+      const frameObject = tfManager.getFrameObject(selectedFrame);
+      if (frameObject) {
+        setManualTransform({
+          position: { ...frameObject.position },
+          rotation: { ...frameObject.quaternion },
+        });
+      }
+    } else {
+      // 重置
+      setManualTransform({ position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0, w: 1 } });
+    }
+  }, [selectedFrame]);
 
-    // 定期更新frame信息
-    const interval = setInterval(updateFrames, 100);
-    return () => clearInterval(interval);
+  const handleFrameSelect = useCallback((frameId) => {
+    setSelectedFrame(frameId);
   }, []);
 
-  const handleFrameSelect = (frameId) => {
-    setSelectedFrame(frameId);
-    const frameObject = tfManager.getFrameObject(frameId);
-    if (frameObject) {
-      setManualTransform({
-        position: {
-          x: frameObject.position.x,
-          y: frameObject.position.y,
-          z: frameObject.position.z
-        },
-        rotation: {
-          x: frameObject.rotation.x,
-          y: frameObject.rotation.y,
-          z: frameObject.rotation.z
-        }
-      });
-    }
-  };
-
+  // 当手动修改输入框时
   const handleTransformChange = (type, axis, value) => {
+    const parsedValue = parseFloat(value) || 0;
     const newTransform = {
       ...manualTransform,
       [type]: {
         ...manualTransform[type],
-        [axis]: parseFloat(value)
-      }
+        [axis]: parsedValue,
+      },
     };
     setManualTransform(newTransform);
 
-    // 应用变换到场景对象
+    // 直接应用变换到场景对象
     if (selectedFrame) {
       const frameObject = tfManager.getFrameObject(selectedFrame);
       if (frameObject) {
@@ -58,42 +81,41 @@ function TFPanel() {
           newTransform.position.y,
           newTransform.position.z
         );
-        frameObject.rotation.set(
-          newTransform.rotation.x,
-          newTransform.rotation.y,
-          newTransform.rotation.z
-        );
+        // 注意：这里直接设置四元数，如果输入是欧拉角需要转换
+        // 为简单起见，我们假设直接输入四元数或位置
+        if (type === 'rotation') {
+            frameObject.quaternion.set(
+                newTransform.rotation.x,
+                newTransform.rotation.y,
+                newTransform.rotation.z,
+                newTransform.rotation.w
+            );
+        }
       }
     }
   };
 
-  const renderFrameTree = (frameId, level = 0) => {
-    const children = Array.from(tfManager.frameHierarchy.entries())
-      .filter(([child, parent]) => parent === frameId)
-      .map(([child]) => child);
-
-    return (
-      <div key={frameId} style={{ marginLeft: level * 20 }}>
-        <div 
-          className={`frame-item ${selectedFrame === frameId ? 'selected' : ''}`}
-          onClick={() => handleFrameSelect(frameId)}
-        >
-          📍 {frameId}
-        </div>
-        {children.map(child => renderFrameTree(child, level + 1))}
-      </div>
-    );
-  };
-
-  const rootFrames = Array.from(frames.keys())
-    .filter(frameId => !tfManager.frameHierarchy.has(frameId));
+  const rootFrames = useMemo(() => 
+    Array.from(frames.keys())
+      .filter(frameId => !hierarchy.has(frameId)),
+    [frames, hierarchy]
+  );
 
   return (
     <div className="tf-panel">
       <h3>TF树结构</h3>
       
       <div className="frame-tree">
-        {rootFrames.map(frameId => renderFrameTree(frameId))}
+        {rootFrames.map(frameId => (
+          <FrameNode 
+            key={frameId} 
+            frameId={frameId} 
+            hierarchy={hierarchy} 
+            level={0} 
+            onSelect={handleFrameSelect} 
+            selectedFrame={selectedFrame} 
+          />
+        ))}
       </div>
 
       {selectedFrame && (
@@ -103,54 +125,32 @@ function TFPanel() {
           <div className="control-group">
             <label>位置 (Position)</label>
             <div className="xyz-controls">
-              <input
-                type="number"
-                step="0.1"
-                value={manualTransform.position.x}
-                onChange={(e) => handleTransformChange('position', 'x', e.target.value)}
-                placeholder="X"
-              />
-              <input
-                type="number"
-                step="0.1"
-                value={manualTransform.position.y}
-                onChange={(e) => handleTransformChange('position', 'y', e.target.value)}
-                placeholder="Y"
-              />
-              <input
-                type="number"
-                step="0.1"
-                value={manualTransform.position.z}
-                onChange={(e) => handleTransformChange('position', 'z', e.target.value)}
-                placeholder="Z"
-              />
+              {['x', 'y', 'z'].map(axis => (
+                <input
+                  key={axis}
+                  type="number"
+                  step="0.1"
+                  value={manualTransform.position[axis]}
+                  onChange={(e) => handleTransformChange('position', axis, e.target.value)}
+                  placeholder={axis.toUpperCase()}
+                />
+              ))}
             </div>
           </div>
 
           <div className="control-group">
-            <label>旋转 (Rotation)</label>
+            <label>旋转 (Quaternion)</label>
             <div className="xyz-controls">
-              <input
-                type="number"
-                step="0.1"
-                value={manualTransform.rotation.x}
-                onChange={(e) => handleTransformChange('rotation', 'x', e.target.value)}
-                placeholder="X"
-              />
-              <input
-                type="number"
-                step="0.1"
-                value={manualTransform.rotation.y}
-                onChange={(e) => handleTransformChange('rotation', 'y', e.target.value)}
-                placeholder="Y"
-              />
-              <input
-                type="number"
-                step="0.1"
-                value={manualTransform.rotation.z}
-                onChange={(e) => handleTransformChange('rotation', 'z', e.target.value)}
-                placeholder="Z"
-              />
+              {['x', 'y', 'z', 'w'].map(axis => (
+                <input
+                  key={axis}
+                  type="number"
+                  step="0.1"
+                  value={manualTransform.rotation[axis]}
+                  onChange={(e) => handleTransformChange('rotation', axis, e.target.value)}
+                  placeholder={axis.toUpperCase()}
+                />
+              ))}
             </div>
           </div>
         </div>

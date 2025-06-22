@@ -132,32 +132,11 @@ class ROSAdapter(BaseAdapter):
             result = []
             for topic in topics_response.get('topics', []):
                 try:
-                    # 获取话题类型
-                    type_future = asyncio.Future()
-                    
-                    def type_callback(topic_type):
-                        if not type_future.done():
-                            type_future.set_result(topic_type)
-                    
-                    def type_error_callback(error):
-                        if not type_future.done():
-                            type_future.set_exception(Exception(error))
-                    
-                    type_service = roslibpy.Service(self.ros, '/rosapi/topic_type', 'rosapi/TopicType')
-                    type_service.call(
-                        roslibpy.ServiceRequest({'topic': topic}), 
-                        type_callback, 
-                        type_error_callback
-                    )
-                    
-                    topic_type_response = await asyncio.wait_for(type_future, timeout=2.0)
-                    topic_type = topic_type_response.get('type', 'unknown')
-                    
+                    topic_type = await self._get_topic_type(topic)
                     result.append({
                         'name': topic,
-                        'type': topic_type
+                        'type': topic_type or 'unknown'
                     })
-                    
                 except Exception as e:
                     print(f"Error getting type for topic {topic}: {e}")
                     result.append({
@@ -181,52 +160,32 @@ class ROSAdapter(BaseAdapter):
             # 如果已经订阅，先取消订阅
             if topic in self.listeners:
                 await self.unsubscribe_topic(topic)
-            
+
+            # 创建一个新的回调函数来处理消息
+            def message_handler(message):
+                # 使用 run_coroutine_threadsafe 将协程提交到主事件循环
+                # 恢复调用 _handle_ros_message 来处理和转换消息
+                self._handle_ros_message(topic, message_type, message)
+
             # 如果没有提供消息类型，动态获取
             if not message_type:
                 try:
-                    future = asyncio.Future()
-                    
-                    def callback(response):
-                        if not future.done():
-                            future.set_result(response)
-                    
-                    def error_callback(error):
-                        if not future.done():
-                            future.set_exception(Exception(error))
-                    
-                    type_service = roslibpy.Service(self.ros, '/rosapi/topic_type', 'rosapi/TopicType')
-                    type_service.call(
-                        roslibpy.ServiceRequest({'topic': topic}), 
-                        callback, 
-                        error_callback
-                    )
-                    
-                    response = await asyncio.wait_for(future, timeout=5.0)
-                    message_type = response.get('type')
-                    
+                    message_type = await self._get_topic_type(topic)
                     if not message_type:
                         print(f"Could not determine message type for topic {topic}")
                         return False
-                        
                 except Exception as e:
                     print(f"Error getting message type for {topic}: {e}")
                     return False
             
-            # 创建话题监听器
+            # 创建订阅者
             listener = roslibpy.Topic(self.ros, topic, message_type)
-            
-            # 设置消息回调
-            def message_callback(message):
-                self._handle_ros_message(topic, message_type, message)
-            
-            listener.subscribe(message_callback)
-            
-            # 保存监听器和订阅信息
             self.listeners[topic] = listener
-            self.subscribed_topics[topic] = message_type
             
-            print(f"Subscribed to topic: {topic} (type: {message_type})")
+            # 订阅话题并绑定回调
+            listener.subscribe(message_handler)
+            
+            print(f"Subscribed to topic: {topic} with type {message_type}")
             return True
             
         except Exception as e:
@@ -254,6 +213,31 @@ class ROSAdapter(BaseAdapter):
         except Exception as e:
             print(f"Error unsubscribing from topic {topic}: {e}")
             return False
+
+    async def _get_topic_type(self, topic: str) -> Optional[str]:
+        """获取单个话题的消息类型"""
+        try:
+            future = asyncio.Future()
+            
+            def callback(response):
+                if not future.done():
+                    future.set_result(response.get('type'))
+            
+            def error_callback(error):
+                if not future.done():
+                    future.set_exception(Exception(error))
+            
+            type_service = roslibpy.Service(self.ros, '/rosapi/topic_type', 'rosapi/TopicType')
+            type_service.call(
+                roslibpy.ServiceRequest({'topic': topic}), 
+                callback, 
+                error_callback
+            )
+            
+            return await asyncio.wait_for(future, timeout=2.0)
+        except Exception as e:
+            print(f"Error getting message type for {topic}: {e}")
+            raise
     
     def _handle_ros_message(self, topic: str, message_type: str, message: dict):
         """处理ROS消息"""

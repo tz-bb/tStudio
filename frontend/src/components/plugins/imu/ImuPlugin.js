@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { VisualizationPlugin } from '../base/VisualizationPlugin';
+import TFWrapper from '../base/TFWrapper'; // 导入 TFWrapper
 
 // 3D 箭头组件
 function Arrow3D({ start, end, color = 'red', thickness = 0.02 }) {
@@ -195,11 +196,13 @@ export class ImuPlugin extends VisualizationPlugin {
            ));
   }
   
-  render(topic, type, data) {
-    console.log(`ImuPlugin rendering topic: ${topic}, data:`, data);
-    return <ImuVisualization data={data} />;
+  render(topic, type, data, frameId, tfManager) {
+    return (
+      <TFWrapper frameId={frameId} tfManager={tfManager}>
+        <ImuVisualization data={data} />
+      </TFWrapper>
+    );
   }
 }
 
-// 默认导出插件实例
 export default new ImuPlugin();

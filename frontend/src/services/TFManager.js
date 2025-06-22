@@ -1,10 +1,9 @@
-import * as THREE from 'three';
+import * as THREE from 'three'; // THREE 将被移除，但我们先保留它以便计算
 
 export class TFManager {
   constructor() {
-    this.frames = new Map(); // frame_id -> TFFrame
+    this.frames = new Map(); // frame_id -> { parent: string, transform: { translation: vec, rotation: quat }, timestamp: time }
     this.frameHierarchy = new Map(); // child_frame -> parent_frame
-    this.sceneObjects = new Map(); // frame_id -> THREE.Group
   }
 
   // 更新TF数据
@@ -13,65 +12,118 @@ export class TFManager {
       const { header, child_frame_id, transform: tf } = transform;
       
       this.frames.set(child_frame_id, {
-        parent_frame: header.frame_id,
-        translation: tf.translation,
-        rotation: tf.rotation,
+        parent: header.frame_id,
+        transform: {
+          translation: new THREE.Vector3(tf.translation.x, tf.translation.y, tf.translation.z),
+          rotation: new THREE.Quaternion(tf.rotation.x, tf.rotation.y, tf.rotation.z, tf.rotation.w),
+        },
         timestamp: header.stamp
       });
       
       this.frameHierarchy.set(child_frame_id, header.frame_id);
     });
-    
-    this.updateSceneGraph();
   }
 
-  // 获取从source到target的变换
-  getTransform(sourceFrame, targetFrame, timestamp) {
-    // 实现TF查找算法
-    return this.computeTransformChain(sourceFrame, targetFrame);
-  }
-
-  // 更新Three.js场景图
-  updateSceneGraph() {
-    this.frames.forEach((tfFrame, frameId) => {
-      let sceneObject = this.sceneObjects.get(frameId);
-      if (!sceneObject) {
-        sceneObject = new THREE.Group();
-        sceneObject.name = frameId;
-        this.sceneObjects.set(frameId, sceneObject);
-      }
-
-      // 设置位置和旋转
-      const { translation, rotation } = tfFrame;
-      sceneObject.position.set(translation.x, translation.y, translation.z);
-      sceneObject.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
-
-      // 建立父子关系
-      const parentFrame = tfFrame.parent_frame;
-      if (parentFrame && this.sceneObjects.has(parentFrame)) {
-        const parentObject = this.sceneObjects.get(parentFrame);
-        if (sceneObject.parent !== parentObject) {
-          parentObject.add(sceneObject);
-        }
-      }
-    });
-  }
-
-  // 获取frame对应的场景对象
-  getFrameObject(frameId) {
-    return this.sceneObjects.get(frameId);
-  }
-
-  // 创建新的frame对象
-  createFrameObject(frameId) {
-    if (!this.sceneObjects.has(frameId)) {
-      const obj = new THREE.Group();
-      obj.name = frameId;
-      this.sceneObjects.set(frameId, obj);
-      return obj;
+  // 获取从 sourceFrame 到 targetFrame 的变换
+  getTransform(targetFrame, sourceFrame) {
+    if (!this.frames.has(sourceFrame) || !this.frames.has(targetFrame)) {
+      return null; // 如果任一坐标系不存在，则无法计算
     }
-    return this.sceneObjects.get(frameId);
+
+    // 路径查找
+    const pathToSource = this._findPathToRoot(sourceFrame);
+    const pathToTarget = this._findPathToRoot(targetFrame);
+
+    if (!pathToSource.length || !pathToTarget.length) {
+        return null; // 无法追溯到根节点
+    }
+
+    // 查找共同祖先
+    let i = pathToSource.length - 1;
+    let j = pathToTarget.length - 1;
+    while (i >= 0 && j >= 0 && pathToSource[i] === pathToTarget[j]) {
+      i--;
+      j--;
+    }
+    const commonAncestor = pathToSource[i + 1];
+
+    // 计算从 source 到共同祖先的变换
+    let transform = new THREE.Matrix4(); // 单位矩阵
+    for (let k = 0; k <= i; k++) {
+      const frameData = this.frames.get(pathToSource[k]);
+      const frameTransform = new THREE.Matrix4().compose(
+        frameData.transform.translation,
+        frameData.transform.rotation,
+        new THREE.Vector3(1, 1, 1)
+      );
+      transform.premultiply(frameTransform);
+    }
+
+    // 计算从 target 到共同祖先的变换，然后取逆
+    let targetToAncestor = new THREE.Matrix4();
+    for (let k = 0; k <= j; k++) {
+      const frameData = this.frames.get(pathToTarget[k]);
+      const frameTransform = new THREE.Matrix4().compose(
+        frameData.transform.translation,
+        frameData.transform.rotation,
+        new THREE.Vector3(1, 1, 1)
+      );
+      targetToAncestor.premultiply(frameTransform);
+    }
+
+    const ancestorToTarget = new THREE.Matrix4().copy(targetToAncestor).invert();
+
+    // 合并变换: source -> ancestor -> target
+    transform.multiply(ancestorToTarget);
+
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+    transform.decompose(position, quaternion, scale);
+
+    return { position, quaternion };
   }
+
+  _findPathToRoot(frameId) {
+    const path = [];
+    let currentFrame = frameId;
+    while (currentFrame && this.frames.has(currentFrame)) {
+      path.push(currentFrame);
+      currentFrame = this.frames.get(currentFrame).parent;
+    }
+    // 如果能找到根，最后一个parent应该是undefined，但根节点本身在frames里
+    if(currentFrame) path.push(currentFrame); // 添加根节点
+    return path;
+  }
+
+  // 为TFVisualizer提供数据
+  getAllFramesAsArray() {
+    return Array.from(this.frames.keys());
+  }
+
+  /**
+   * 获取TF树的根坐标系。
+   * 理想情况下只有一个根，但如果存在多个或没有，则返回一个默认值。
+   * @returns {string} 根坐标系的ID。
+   */
+  getRootFrame() {
+    const roots = new Set(this.frames.keys());
+    for (const child of this.frameHierarchy.keys()) {
+      roots.delete(child);
+    }
+
+    if (roots.size === 1) {
+      return roots.values().next().value;
+    }
+
+    // 如果有多个根或没有根，返回一个默认的固定参考系
+    // TODO: 这个默认值应该可以配置
+    return 'world'; 
+  }
+
+  /**
+   * 计算从一个源坐标系到目标坐标系的变换。
+   */
 }
 
 // 全局TF管理器实例

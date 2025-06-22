@@ -1,15 +1,19 @@
 import React from 'react';
 import { Text } from '@react-three/drei';
 import { VisualizationPlugin } from '../base/VisualizationPlugin';
+import TFWrapper from '../base/TFWrapper'; // 导入 TFWrapper
 
 // 文本可视化组件
 function TextVisualization({ data, topic }) {
   if (!data) return null;
   
+  console.log("in TextPlugin _ ",JSON.stringify(data))
+
   const textContent = typeof data.data === 'string' ? data.data : 
                      data.data?.data || 
                      JSON.stringify(data.data, null, 2);
   
+  console.log("in Text _ ",textContent)
   // 根据话题名称确定位置
   const position = [0, 3 + Math.abs(topic.length % 5), 0];
   
@@ -37,8 +41,12 @@ export class TextPlugin extends VisualizationPlugin {
     return type === 'std_msgs/String'
   }
   
-  render(topic, type, data) {
-    return <TextVisualization data={data} topic={topic} />;
+  render(topic, type, data, frameId, tfManager) {
+    return (
+        <TFWrapper frameId={frameId} tfManager={tfManager}>
+            <TextVisualization data={data} topic={topic} />
+        </TFWrapper>
+    );
   }
 }
 

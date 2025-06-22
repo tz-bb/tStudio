@@ -34,7 +34,7 @@ export class VisualizationPlugin {
     throw new Error(`Plugin ${this.name}: canHandle method must be implemented`);
   }
 
-  render(topic, type, data) {
+  render(topic, type, data, frameId, tfManager) {
     throw new Error(`Plugin ${this.name}: render method must be implemented`);
   }
   
@@ -99,20 +99,19 @@ export class VisualizationPluginManager {
   }
   
   // 获取或创建消息实例
-  getOrCreateInstance(topic, data) {
+  getOrCreateInstance(topic, message) { // 参数从 data 改为 message
     // 如果该topic已有实例，直接返回
     if (this.messageInstances.has(topic)) {
       return this.messageInstances.get(topic);
     }
     
     // 查找合适的插件类型
-    console.log(`markdebug ! - findPluginType: ${topic}, ${data.message_type}, ${data.data}`)
-    const pluginType = this.findPluginType(topic, data.message_type, data.data);
+    const pluginType = this.findPluginType(topic, message.message_type, message.data);
     if (!pluginType) {
-      console.warn(`No plugin found for topic: ${topic}`);
+      console.warn(`No plugin found for topic: ${topic}, type: ${message.message_type}`);
       return null;
     }else{
-      console.log(`markdebug - got plugin: ${pluginType.name}`)
+      console.log(`Found plugin for ${topic}: ${pluginType.name}`)
     }
     
     // 创建新的插件实例（克隆插件类型）
@@ -127,15 +126,16 @@ export class VisualizationPluginManager {
   }
   
   // 渲染数据
-  render(topic, data) {
-    const pluginInstance = this.getOrCreateInstance(topic, data);
+  render(topic, message, tfManager) { // 参数从 data 改为 message
+    const pluginInstance = this.getOrCreateInstance(topic, message);
     if (!pluginInstance) {
-      console.warn(`No plugin found for topic: ${topic}. data - ${JSON.stringify(data)}`);
       return null;
     }
     
     try {
-      return pluginInstance.render(topic, data.message_type, data.data);
+      // 提取 frameId 并传递给插件的 render 方法
+      const frameId = message.data?.header?.frame_id || 'world'; // 默认 frame
+      return pluginInstance.render(topic, message.message_type, message.data, frameId, tfManager);
     } catch (error) {
       console.error(`Plugin ${pluginInstance.name} render error:`, error);
       return null;

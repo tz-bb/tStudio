@@ -33,6 +33,7 @@ class WebSocketManager {
       this.ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
+          console.log("from websocket origin data _ ",message)
           this.emit(message.type, message.data || message);
         } catch (error) {
           console.error('[WebSocket] ❌ 消息解析失败:', error, '原始数据:', event.data);

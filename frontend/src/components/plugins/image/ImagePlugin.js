@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { VisualizationPlugin } from '../base/VisualizationPlugin';
+import TFWrapper from '../base/TFWrapper'; // 导入 TFWrapper
 
 function decodeRosBridgeData(encodedString){
     const decodedString = atob(encodedString);
@@ -190,16 +191,17 @@ export class ImagePlugin extends VisualizationPlugin {
         return type === "sensor_msgs/Image"
     }
 
-    render(topic, type, data) {
+    render(topic, type, data, frameId, tfManager) {
         return (
-            <ImageVisualization
-                key={`image-${topic}`}
-                data={data}
-                topic={topic}
-            />
+            <TFWrapper frameId={frameId} tfManager={tfManager}>
+                <ImageVisualization
+                    key={`image-${topic}`}
+                    data={data}
+                    topic={topic}
+                />
+            </TFWrapper>
         );
     }
 }
 
-// 导出插件实例（修改这里）
 export default new ImagePlugin();

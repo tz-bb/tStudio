@@ -24,6 +24,8 @@ const MainView = () => {
   const [wsManager] = useState(() => new WebSocketManager());
   const [wsStatus, setWsStatus] = useState('disconnected');
   const [debugInfo, setDebugInfo] = useState([]);
+  const [tfFrames, setTfFrames] = useState(new Map());
+  const [tfHierarchy, setTfHierarchy] = useState(new Map());
 
   // 添加调试信息
   const addDebugInfo = (message, type = 'info') => {
@@ -48,24 +50,29 @@ const MainView = () => {
       addDebugInfo(`连接状态更新: ${data.connected ? '已连接' : '未连接'}`);
     };
     
-    const handleDataUpdate = (data) => {
+    const handleDataUpdate = (message) => { // 参数从 data 改为 message
       // 检查是否为TF数据
-      if (data.message_type === 'tf2_msgs/TFMessage') {
-        tfManager.updateTF(data.data);
+      // 使用 message.topic 和 message.message_type
+      if (message.topic === '/tf' || message.message_type === 'tf2_msgs/TFMessage') {
+        tfManager.updateTF(message.data);
+        // 从tfManager获取最新状态并更新React state
+        setTfFrames(new Map(tfManager.frames));
+        setTfHierarchy(new Map(tfManager.frameHierarchy));
         return;
       }
       
       // 检查topic是否仍在订阅状态
-      if (!subscribedTopicsRef.current.has(data.topic)) {
-        console.log(`忽略已取消订阅topic的数据: ${data.topic}`);
+      console.log(`in handleDataUpdate - ${JSON.stringify(message)}`)
+      if (!subscribedTopicsRef.current.has(message.topic)) {
+        console.log(`忽略已取消订阅topic的数据: ${message.topic}`);
         return;
       }
       
       setSceneData(prev => ({
         ...prev,
-        [data.topic]: data
+        [message.topic]: message // 使用完整的 message 对象
       }));
-      addDebugInfo(`收到话题数据: ${data.topic}`);
+      addDebugInfo(`收到话题数据: ${message.topic}`);
     };
     
     const handleTopicSubscribed = (data) => {
@@ -187,8 +194,11 @@ const MainView = () => {
           wsManager={wsManager}
         />
         
-        {/* 添加TF面板 */}
-        <TFPanel />
+        {/* 添加TF面板，并通过props传递状态和回调 */}
+        <TFPanel 
+          frames={tfFrames}
+          hierarchy={tfHierarchy}
+        />
         
         {/* 新增文本数据面板 */}
         {/* <TextDataPanel sceneData={sceneData} /> */}

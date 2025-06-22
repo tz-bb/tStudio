@@ -82,6 +82,7 @@ class BaseAdapter(ABC):
                     self.message_buffer.clear()
                 
                 # 发送批量更新
+                # print(f"[DEBUG] Sending batch update for topics: {list(messages_to_send.keys())}") # <--- 添加这行
                 for topic, data in messages_to_send.items():
                     await self._notify_callbacks(topic, data)
                     

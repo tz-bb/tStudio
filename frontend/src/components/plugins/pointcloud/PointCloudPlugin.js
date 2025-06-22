@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
 import { VisualizationPlugin } from '../base/VisualizationPlugin';
+import TFWrapper from '../base/TFWrapper'; // 导入 TFWrapper
 
 // 点云可视化组件
 function PointCloud({ data }) {
@@ -49,10 +50,12 @@ export class PointCloudPlugin extends VisualizationPlugin {
     return type === "sensor_msgs/PointCloud2";
   }
   
-  render(topic, type, data) {
-    // 使用TF支持的渲染
-    return this.renderWithTF(topic, type, data, 
-      <PointCloud data={data} />
+  render(topic, type, data, frameId, tfManager) {
+    // 使用TFWrapper包裹可视化组件
+    return (
+      <TFWrapper frameId={frameId} tfManager={tfManager}>
+        <PointCloud data={data} />
+      </TFWrapper>
     );
   }
 }

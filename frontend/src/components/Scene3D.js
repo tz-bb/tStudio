@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { initializePlugins } from './plugins';
+import { tfManager } from '../services/TFManager'; // 导入 tfManager
 
 function Scene3D({ data }) {
   const [pluginManager, setPluginManager] = useState(null);
@@ -39,7 +40,8 @@ function Scene3D({ data }) {
       {/* 动态渲染所有话题数据 */}
       {/* 确保 pluginManager 已初始化后再进行渲染，防止空指针错误 */}
       {pluginManager && Object.entries(data).map(([topic, topicData]) => {
-        const renderedComponent = pluginManager.render(topic, topicData);
+        // 将 tfManager 传递给 render 方法
+        const renderedComponent = pluginManager.render(topic, topicData, tfManager);
         return <React.Fragment key={topic}>{renderedComponent}</React.Fragment>;
       })}
     </group>
