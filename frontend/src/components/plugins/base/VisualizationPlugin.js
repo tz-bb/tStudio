@@ -15,7 +15,7 @@ export class VisualizationPlugin {
     if (data.header && data.header.frame_id) {
       return data.header.frame_id;
     }
-    return 'base_link'; // 默认frame
+    return 'world'; // 默认frame
   }
 
   // 创建带TF支持的渲染组件

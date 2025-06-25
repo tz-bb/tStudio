@@ -144,7 +144,7 @@ class MockAdapter(BaseAdapter):
                         "sec": int(current_time),
                         "nsec": int((current_time % 1) * 1e9)
                     },
-                    "frame_id": "base_link"
+                    "frame_id": "world"
                 },
                 "child_frame_id": "laser_frame",
                 "transform": {
@@ -167,7 +167,7 @@ class MockAdapter(BaseAdapter):
                         "sec": int(current_time),
                         "nsec": int((current_time % 1) * 1e9)
                     },
-                    "frame_id": "base_link"
+                    "frame_id": "world"
                 },
                 "child_frame_id": "camera_frame",
                 "transform": {

@@ -4,6 +4,7 @@ export class TFManager {
   constructor() {
     this.frames = new Map(); // frame_id -> { parent: string, transform: { translation: vec, rotation: quat }, timestamp: time }
     this.frameHierarchy = new Map(); // child_frame -> parent_frame
+    this.childrenMap = new Map(); // parent_frame -> [child_frame]
   }
 
   // 更新TF数据
@@ -20,14 +21,56 @@ export class TFManager {
         timestamp: header.stamp
       });
       
-      this.frameHierarchy.set(child_frame_id, header.frame_id);
+      const parentFrameId = header.frame_id;
+      
+      // 更新父子关系
+      const oldParent = this.frameHierarchy.get(child_frame_id);
+      if (oldParent && oldParent !== parentFrameId) {
+        // 如果父节点改变，从旧的父节点子列表中移除
+        const childrenOfOldParent = this.childrenMap.get(oldParent);
+        if (childrenOfOldParent) {
+          const index = childrenOfOldParent.indexOf(child_frame_id);
+          if (index > -1) {
+            childrenOfOldParent.splice(index, 1);
+          }
+        }
+      }
+
+      this.frameHierarchy.set(child_frame_id, parentFrameId);
+
+      // 更新新的父节点的子列表
+      if (!this.childrenMap.has(parentFrameId)) {
+        this.childrenMap.set(parentFrameId, []);
+      }
+      const children = this.childrenMap.get(parentFrameId);
+      if (!children.includes(child_frame_id)) {
+        children.push(child_frame_id);
+      }
     });
+  }
+
+  // 获取子节点
+  getChildren(frameId) {
+    return this.childrenMap.get(frameId) || [];
   }
 
   // 获取从 sourceFrame 到 targetFrame 的变换
   getTransform(targetFrame, sourceFrame) {
-    if (!this.frames.has(sourceFrame) || !this.frames.has(targetFrame)) {
-      return null; // 如果任一坐标系不存在，则无法计算
+    // 新增：如果源和目标坐标系相同，返回单位变换
+    if (targetFrame === sourceFrame) {
+      return {
+        translation: new THREE.Vector3(0, 0, 0),
+        rotation: new THREE.Quaternion(0, 0, 0, 1),
+      };
+    }
+
+    const rootFrame = this.getRootFrame();
+    // 检查非根坐标系是否存在
+    if (
+      (targetFrame !== rootFrame && !this.frames.has(targetFrame)) ||
+      (sourceFrame !== rootFrame && !this.frames.has(sourceFrame))
+    ) {
+      return null; // 如果任一非根坐标系不存在，则无法计算
     }
 
     // 路径查找

@@ -1,63 +1,84 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { VisualizationPlugin } from '../base/VisualizationPlugin';
 import { tfManager } from '../../../services/TFManager';
 
 // 可视化单个Frame的组件
-const Frame = ({ frameId, rootFrame }) => {
-  const axesRef = useRef();
+const Frame = ({ frameId }) => {
+  const groupRef = useRef();
 
   useFrame(() => {
-    if (axesRef.current) {
-      const transform = tfManager.getTransform(rootFrame, frameId);
-      if (transform) {
-        axesRef.current.position.copy(transform.position);
-        axesRef.current.quaternion.copy(transform.quaternion);
+    if (groupRef.current) {
+      const frameData = tfManager.frames.get(frameId);
+      console.log("in useFrame", frameId, frameData)
+      if (frameData && frameData.transform) {
+        const { translation, rotation } = frameData.transform;
+        groupRef.current.position.copy(translation);
+        groupRef.current.quaternion.copy(rotation);
+        groupRef.current.visible = true;
+      } else {
+        // 如果在tfManager中找不到，可能是一个根节点或者数据还未到达
+        const isRoot = !tfManager.frameHierarchy.has(frameId);
+        if(isRoot) {
+          groupRef.current.position.set(0,0,0);
+          groupRef.current.quaternion.set(0,0,0,1);
+          groupRef.current.visible = true;
+        } else {
+          groupRef.current.visible = false;
+        }
       }
     }
   });
 
-  return <axesHelper ref={axesRef} args={[0.5]} />;
-};
-
-// 渲染所有TF Visuals的组件
-const TFVisuals = ({ rootFrame }) => {
-  const [frames, setFrames] = useState([]);
-
-  useEffect(() => {
-    // 设置一个定时器来定期刷新坐标系列表
-    const interval = setInterval(() => {
-      const allFrames = tfManager.getAllFramesAsArray();
-      setFrames(allFrames);
-    }, 1000); // 每秒更新一次
-
-    return () => clearInterval(interval);
-  }, []);
+  const children = tfManager.getChildren(frameId);
 
   return (
-    <group>
-      {frames.map(frame => (
-        <Frame key={frame.id} frameId={frame.id} rootFrame={rootFrame} />
+    <group ref={groupRef}>
+      <axesHelper args={[0.5]} />
+      {/* 递归渲染子节点 */}
+      {children.map(childId => (
+        <Frame key={childId} frameId={childId} />
       ))}
     </group>
   );
 };
 
+// 渲染整个TF树的组件
+const TFTree = () => {
+  const [rootFrame, setRootFrame] = useState(tfManager.getRootFrame());
+
+  // 这里我们不再使用setInterval，而是需要一种方式来监听tfManager的变化
+  // 理想情况下tfManager应该是一个事件发射器
+  // 作为一个简单的替代方案，我们可以在这里用一个定时器来强制刷新
+  // 但更好的方式是让外部调用来触发更新
+  useEffect(() => {
+    const handleTFUpdate = () => {
+      setRootFrame(tfManager.getRootFrame());
+    };
+
+    // 这是一个简化的事件监听，实际应用中需要一个更健壮的事件系统
+    const interval = setInterval(handleTFUpdate, 1000); // 模拟数据更新的监听
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!rootFrame) return null;
+
+  return <Frame frameId={rootFrame} />;
+};
 
 export class TFVisualizerPlugin extends VisualizationPlugin {
   constructor() {
-    super('TF', 'tf2_msgs/TFMessage');
+    super('TF', 1, '1.0.0');
+  }
+
+  canHandle(topic, type, data) {
+    return type === 'tf2_msgs/TFMessage';
   }
 
   render(topic, type, data, frameId) {
-    // TF的可视化不依赖于单条消息，而是依赖于tfManager的全局状态
-    // 我们只需要一个根坐标系来计算所有其他坐标系的相对位置
-    // 通常，这会是一个固定的frame，比如 'world' 或 'map'
-    // 这里我们暂时硬编码为 'base_link'，后续可以做成可配置的
-    const fixedFrame = 'base_link'; 
-
-    // 返回一个持续渲染所有TF的组件
-    return <TFVisuals key="tf-visualizer" rootFrame={fixedFrame} />;
+    return <TFTree key={`tf-tree-${Date.now()}`} />;
   }
 }
+
+export default new TFVisualizerPlugin();

@@ -58,11 +58,10 @@ const MainView = () => {
         // 从tfManager获取最新状态并更新React state
         setTfFrames(new Map(tfManager.frames));
         setTfHierarchy(new Map(tfManager.frameHierarchy));
-        return;
+        // return;
       }
       
       // 检查topic是否仍在订阅状态
-      console.log(`in handleDataUpdate - ${JSON.stringify(message)}`)
       if (!subscribedTopicsRef.current.has(message.topic)) {
         console.log(`忽略已取消订阅topic的数据: ${message.topic}`);
         return;

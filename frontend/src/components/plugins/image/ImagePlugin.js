@@ -158,7 +158,7 @@ function ImageInfo({ data, position = [0, -1, 0] }) {
 function ImageVisualization({ data, topic }) {
     // TODO: 预留TF变换接口
     // 当TF系统实现后，可以根据header.frame_id获取变换矩阵
-    // const tfTransform = useTFTransform(data.header.frame_id, 'base_link');
+    // const tfTransform = useTFTransform(data.header.frame_id, 'world');
 
     // 暂时使用固定位置，后续可以根据TF变换调整
     const position = [0, 0, 0];

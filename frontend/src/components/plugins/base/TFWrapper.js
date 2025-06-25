@@ -19,14 +19,15 @@ function TFWrapper({ frameId, tfManager, children }) {
       // 在此示例中，我们获取相对于场景根（即固定参考系）的变换
       const fixedFrame = tfManager.getRootFrame(); // 假设 tfManager 提供了获取根节点的方法
       const transform = tfManager.getTransform(frameId, fixedFrame);
-      console.log("debugTFWrapper _ ",fixedFrame, transform)
+      console.log("debugTFWrapper _ ", frameId, fixedFrame, transform)
       if (transform) {
         const { translation, rotation } = transform;
         groupRef.current.position.set(translation.x, translation.y, translation.z);
         groupRef.current.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
       } else {
         // 如果找不到变换，可以选择隐藏对象或保持在原位
-        // console.warn(`Transform from ${fixedFrame} to ${frameId} not found.`);
+        console.warn(`Transform from ${fixedFrame} to ${frameId} not found.`);
+        // set visible false
         groupRef.current.visible = false;
       }
     }

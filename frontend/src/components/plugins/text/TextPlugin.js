@@ -7,13 +7,10 @@ import TFWrapper from '../base/TFWrapper'; // 导入 TFWrapper
 function TextVisualization({ data, topic }) {
   if (!data) return null;
   
-  console.log("in TextPlugin _ ",JSON.stringify(data))
-
   const textContent = typeof data.data === 'string' ? data.data : 
                      data.data?.data || 
                      JSON.stringify(data.data, null, 2);
   
-  console.log("in Text _ ",textContent)
   // 根据话题名称确定位置
   const position = [0, 3 + Math.abs(topic.length % 5), 0];
   
