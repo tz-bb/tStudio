@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid, Stats } from '@react-three/drei';
+import { OrbitControls, Grid, Stats, AxesHelper } from '@react-three/drei'; // 引入AxesHelper用于调试
 import ConnectionPanel from './ConnectionPanel';
 import TopicPanel from './TopicPanel';
 import Scene3D from './Scene3D';
@@ -9,6 +9,26 @@ import './MainView.css';
 import TextDataPanel from './TextDataPanel';
 import TFPanel from './TFPanel';
 import { tfManager } from '../services/TFManager';
+import * as THREE from 'three'; // 引入THREE
+
+// 在应用启动时设置一次，确保只执行一次
+THREE.Object3D.DEFAULT_UP = new THREE.Vector3(0, 0, 1);
+
+// 创建一个包裹场景内容的组件
+const World = ({ data }) => {
+  return (
+    <group rotation={[Math.PI / 2, 0, 0]}>
+      {/* Scene3D现在是World的子组件，其内容会自动应用旋转 */}
+      <Scene3D data={data} />
+      
+      {/* Grid现在也在这里，它会自动对齐到新的XY平面 */}
+      <Grid args={[30, 30]} />
+
+      {/* 添加一个坐标轴辅助器，方便观察坐标系，红色X, 绿色Y, 蓝色Z */}
+      <axesHelper args={[5]} />
+    </group>
+  );
+};
 
 const MainView = () => {
   const [connectionStatus, setConnectionStatus] = useState({
@@ -204,14 +224,17 @@ const MainView = () => {
       </div>
       <div className="canvas-container">
         <Canvas
-          camera={{ position: [10, 10, 10], fov: 60 }}
+          camera={{ position: [7, -14, 10], fov: 60 }}
           style={{ background: '#1a1a1a' }}
         >
           <ambientLight intensity={0.6} />
           <directionalLight position={[15, 15, 5]} intensity={1} />
           <directionalLight position={[-15, -15, 5]} intensity={1} />
-          <Scene3D data={sceneData} />
-          <Grid args={[20, 20]} />
+          
+          {/* 使用World组件包裹你的场景 */}
+          <World data={sceneData} />
+          
+          {/* OrbitControls 和 Stats 放在Canvas根下，不受World旋转影响 */}
           <OrbitControls enablePan={true} enableZoom={true} enableRotate={true} />
           <Stats />
         </Canvas>

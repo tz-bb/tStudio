@@ -240,19 +240,37 @@ class ROSAdapter(BaseAdapter):
             raise
     
     def _handle_ros_message(self, topic: str, message_type: str, message: dict):
-        """处理ROS消息"""
+        """处理ROS消息（集成插件系统）"""
         try:
             converted_data = self._convert_ros_message(topic, message, message_type)
             
             if converted_data and self._main_loop:
-                # 使用基类的缓冲方法
+                # 使用基类的缓冲方法（现在包含插件处理）
                 asyncio.run_coroutine_threadsafe(
-                    self._buffer_message(topic, converted_data), 
+                    self._buffer_message(topic, converted_data, message_type), 
                     self._main_loop
                 )
                 
         except Exception as e:
             print(f"Error handling ROS message from {topic}: {e}")
+    
+    async def _disconnect_impl(self) -> bool:
+        """实现具体的断开逻辑"""
+        try:
+            # 取消所有订阅
+            for topic_name in list(self.listeners.keys()):
+                await self.unsubscribe_topic(topic_name)
+            
+            # 关闭ROS连接
+            if self.ros and self.ros.is_connected:
+                self.ros.close()
+            
+            self.is_connected = False
+            return True
+            
+        except Exception as e:
+            print(f"ROS adapter disconnection error: {e}")
+            return False
     
     def _convert_ros_message(self, topic: str, message: dict, message_type: str) -> Optional[Dict[str, Any]]:
         """转换ROS消息为统一格式"""

@@ -89,7 +89,20 @@ class MockAdapter(BaseAdapter):
         except Exception as e:
             print(f"Mock adapter disconnection error: {e}")
             return False
-    
+
+    async def _disconnect_impl(self) -> bool:
+        """实现具体的断开逻辑"""
+        try:
+            # 取消所有订阅
+            for topic_name in list(self.listeners.keys()):
+                await self.unsubscribe_topic(topic_name)
+            self.is_connected = False
+            return True
+            
+        except Exception as e:
+            print(f"Mock adapter disconnection error: {e}")
+            return False
+
     async def subscribe_topic(self, topic: str, message_type: str = None) -> bool:
         """订阅话题"""
         try:

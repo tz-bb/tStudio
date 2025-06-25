@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Callable, List
+from typing import Dict, Any, Callable, Optional, List
 import asyncio
 from datetime import datetime
+from plugins.plugin_manager import PluginManager
 
 class BaseAdapter(ABC):
     """数据源适配器基类"""
@@ -19,11 +20,22 @@ class BaseAdapter(ABC):
         self.message_buffer = {}
         self.buffer_lock = None  # 延迟初始化
         self.batch_update_task = None
+        
+        # 插件系统
+        self.plugin_manager = PluginManager()
+        self.plugins_initialized = False
     
     async def _ensure_async_resources(self):
         """确保异步资源已初始化"""
         if self.buffer_lock is None:
             self.buffer_lock = asyncio.Lock()
+        
+        # 初始化插件系统
+        if not self.plugins_initialized:
+            import os
+            plugins_dir = os.path.join(os.path.dirname(__file__), '..', 'plugins')
+            await self.plugin_manager.initialize(plugins_dir)
+            self.plugins_initialized = True
     
     def enable_message_batching(self, frequency: float = 30.0):
         """启用消息批处理（仅设置标志，不创建任务）"""
@@ -50,16 +62,33 @@ class BaseAdapter(ABC):
                 pass
             self.batch_update_task = None
     
-    async def _buffer_message(self, topic: str, data: dict):
-        """缓冲消息或直接发送"""
+    async def _buffer_message(self, topic: str, data: dict, message_type: str = None):
+        """缓冲消息或直接发送（集成插件处理）"""
         await self._ensure_async_resources()
+        
+        # 通过插件系统处理消息
+        processed_data = await self._process_through_plugins(topic, message_type, data)
+        
+        # 如果插件返回None，表示消息被过滤
+        if processed_data is None:
+            return
         
         if self.enable_batching:
             async with self.buffer_lock:
-                self.message_buffer[topic] = data
+                self.message_buffer[topic] = processed_data
         else:
             # 直接发送
-            await self._notify_callbacks(topic, data)
+            await self._notify_callbacks(topic, processed_data)
+    
+    async def _process_through_plugins(self, topic: str, message_type: str, data: dict) -> Optional[dict]:
+        """通过插件系统处理消息"""
+        try:
+            if self.plugins_initialized:
+                return await self.plugin_manager.process_message(topic, message_type or 'unknown', data)
+            return data
+        except Exception as e:
+            print(f"Error processing message through plugins: {e}")
+            return data
     
     async def _batch_update_loop(self):
         """批量更新循环"""
@@ -82,7 +111,6 @@ class BaseAdapter(ABC):
                     self.message_buffer.clear()
                 
                 # 发送批量更新
-                # print(f"[DEBUG] Sending batch update for topics: {list(messages_to_send.keys())}") # <--- 添加这行
                 for topic, data in messages_to_send.items():
                     await self._notify_callbacks(topic, data)
                     
@@ -115,7 +143,21 @@ class BaseAdapter(ABC):
     
     @abstractmethod
     async def disconnect(self) -> bool:
-        """断开连接"""
+        """断开连接（添加插件清理）"""
+        # 停止批处理任务
+        await self._stop_batch_update_task()
+        
+        # 清理插件
+        if self.plugins_initialized:
+            await self.plugin_manager.cleanup()
+            self.plugins_initialized = False
+        
+        # 子类实现具体的断开逻辑
+        return await self._disconnect_impl()
+    
+    @abstractmethod
+    async def _disconnect_impl(self) -> bool:
+        """子类实现具体的断开逻辑"""
         pass
     
     @abstractmethod
