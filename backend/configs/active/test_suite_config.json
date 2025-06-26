@@ -1,0 +1,12 @@
+{
+    "group1": {
+        "param2": {
+            "__value__": "",
+            "__metadata__": {
+                "type": "string",
+                "description": "A string value.",
+                "ui_hint": "textfield"
+            }
+        }
+    }
+}

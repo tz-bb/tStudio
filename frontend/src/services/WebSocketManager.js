@@ -8,7 +8,13 @@ class WebSocketManager {
     this.connectionState = 'disconnected'; // 添加连接状态跟踪
   }
 
-  connect(url = 'ws://localhost:3500/ws') {
+  // 连接到WebSocket服务器
+  connect(url = 'ws://localhost:3500/api/ws') {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      this.emit('websocket_max_reconnect_reached');
+      console.log('达到最大重连次数，停止重连');
+      return
+    }
     console.log(`[WebSocket] 尝试连接到: ${url}`);
     
     // 如果已经有连接，先关闭

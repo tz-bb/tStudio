@@ -57,11 +57,7 @@ class MessageLoggerPlugin(BasePlugin):
     async def process_message(self, topic: str, message_type: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """记录消息统计"""
         self.message_count += 1
-        
-        # 每100条消息打印一次统计
-        if self.message_count % 100 == 0:
-            print(f"Processed {self.message_count} messages")
-        
+
         # 添加处理时间戳
         if 'metadata' not in data:
             data['metadata'] = {}
