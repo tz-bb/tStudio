@@ -1,0 +1,5 @@
+# 包含生产环境的所有依赖
+-r requirements.txt
+
+# 仅用于开发的依赖
+pytest

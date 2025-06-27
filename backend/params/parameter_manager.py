@@ -46,6 +46,7 @@ class ParameterManager:
     def __init__(self):
         # 目前只硬编码一个FileParameterAdapter，未来可以扩展为动态加载
         self.adapter: BaseParameterAdapter = FileParameterAdapter(config_dir="configs")
+        self.auto_backup_state: Dict[str, Dict[str, Any]] = {}
 
     async def get_configs_list(self) -> List[str]:
         """获取可用配置的列表。"""
