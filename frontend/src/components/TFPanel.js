@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { tfManager } from '../services/TFManager'; // 仍然需要它来修改3D对象
 import './TFPanel.css';
+import { useAppContext } from '../services/AppContext';
 
 // 渲染TF树的递归组件
 const FrameNode = React.memo(({ frameId, hierarchy, level, onSelect, selectedFrame }) => {
@@ -33,7 +34,8 @@ const FrameNode = React.memo(({ frameId, hierarchy, level, onSelect, selectedFra
   );
 });
 
-function TFPanel({ frames, hierarchy }) {
+function TFPanel() {
+  const { tfFrames: frames, tfHierarchy: hierarchy } = useAppContext();
   const [selectedFrame, setSelectedFrame] = useState(null);
   const [manualTransform, setManualTransform] = useState({
     position: { x: 0, y: 0, z: 0 },
@@ -100,6 +102,10 @@ function TFPanel({ frames, hierarchy }) {
       .filter(frameId => !hierarchy.has(frameId)),
     [frames, hierarchy]
   );
+
+  if (frames.size === 0) {
+    return <div style={{ padding: '10px', color: '#888' }}>No TF data received.</div>;
+  }
 
   return (
     <div className="tf-panel">

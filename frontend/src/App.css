@@ -1,5 +1,77 @@
-.App {
-  text-align: center;
+.app-container {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #1e1e1e;
+}
+
+.app-layout {
+  flex-grow: 1;
+  position: relative; /* Required for flexlayout-react */
+}
+
+.scene-stats {
+  position: absolute !important; /* Use important to override inline styles */
+  bottom: 10px !important;
+  right: 10px !important;
+  left: auto !important;
+  top: auto !important;
+  z-index: 1000;
+}
+
+/* Menu Bar Styles */
+.app-menu-bar {
+  background-color: #252526;
+  color: white;
+  padding: 0 10px;
+  display: flex;
+  height: 30px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropbtn {
+  background-color: transparent;
+  color: white;
+  padding: 5px 10px;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: #333;
+  min-width: 160px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 1001; /* Ensure dropdown is above stats */
+}
+
+.dropdown-content a {
+  color: white;
+  padding: 8px 12px;
+  text-decoration: none;
+  display: block;
+}
+
+.dropdown-content a:hover {background-color: #555;}
+
+.dropdown:hover .dropdown-content {
+  display: block;
+}
+
+.dropdown:hover .dropbtn {
+  background-color: #444;
 }
 
 .App-logo {

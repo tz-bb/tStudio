@@ -27,7 +27,7 @@ const Scene3DComponent = () => {
       <directionalLight position={[15, 15, 5]} intensity={1} />
       <World data={sceneData} />
       <OrbitControls enablePan={true} enableZoom={true} enableRotate={true} />
-      <Stats />
+      <Stats className="scene-stats" />
     </Canvas>
   );
 };
@@ -35,5 +35,10 @@ const Scene3DComponent = () => {
 export class Scene3DPlugin extends UIPanelPlugin {
   typeName = 'scene-3d';
   name = '3D Scene';
-  createComponent = () => <Scene3DComponent />;
+
+  createComponent = () => {
+    return <Scene3DComponent />;
+  }
 }
+
+export default Scene3DPlugin;
