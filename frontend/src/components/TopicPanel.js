@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import ApiService from '../services/ApiService';
 import './TopicPanel.css';
 
-function TopicPanel({ topics, setTopics, connectionStatus, wsManager }) {
+function TopicPanel({ connectionStatus, wsManager }) { // Removed topics and setTopics from props
+  const [topics, setTopics] = useState([]); // Added internal state for topics
   const [loading, setLoading] = useState(false);
   const [subscribedTopics, setSubscribedTopics] = useState(new Set());
 
@@ -11,10 +12,10 @@ function TopicPanel({ topics, setTopics, connectionStatus, wsManager }) {
       loadTopics();
       setSubscribedTopics(new Set(connectionStatus.subscribed_topics));
     } else {
-      setTopics([]);
+      setTopics([]); // This now correctly updates the internal state
       setSubscribedTopics(new Set());
     }
-  }, [connectionStatus, setTopics]);
+  }, [connectionStatus]); // Removed setTopics from dependency array
 
   const loadTopics = async () => {
     setLoading(true);
