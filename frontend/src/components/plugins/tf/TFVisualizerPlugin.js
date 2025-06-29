@@ -48,19 +48,20 @@ const Frame = ({ frameId }) => {
 const TFTree = () => {
   const [rootFrame, setRootFrame] = useState(tfManager.getRootFrame());
 
-  // 这里我们不再使用setInterval，而是需要一种方式来监听tfManager的变化
-  // 理想情况下tfManager应该是一个事件发射器
-  // 作为一个简单的替代方案，我们可以在这里用一个定时器来强制刷新
-  // 但更好的方式是让外部调用来触发更新
   useEffect(() => {
     const handleTFUpdate = () => {
+      // 强制组件重新渲染以获取最新的根节点和层级结构
       setRootFrame(tfManager.getRootFrame());
     };
 
-    // 这是一个简化的事件监听，实际应用中需要一个更健壮的事件系统
-    const interval = setInterval(handleTFUpdate, 1000); // 模拟数据更新的监听
-    return () => clearInterval(interval);
-  }, []);
+    // 监听tfManager的更新事件
+    tfManager.on('update', handleTFUpdate);
+
+    // 组件卸载时移除监听
+    return () => {
+      tfManager.off('update', handleTFUpdate);
+    };
+  }, []); // 空依赖数组确保只在挂载和卸载时运行
 
   if (!rootFrame) return null;
 

@@ -5,6 +5,30 @@ export class TFManager {
     this.frames = new Map(); // frame_id -> { parent: string, transform: { translation: vec, rotation: quat }, timestamp: time }
     this.frameHierarchy = new Map(); // child_frame -> parent_frame
     this.childrenMap = new Map(); // parent_frame -> [child_frame]
+    this.listeners = new Map(); // event_name -> [callback]
+  }
+
+  // 添加事件监听
+  on(eventName, callback) {
+    if (!this.listeners.has(eventName)) {
+      this.listeners.set(eventName, []);
+    }
+    this.listeners.get(eventName).push(callback);
+  }
+
+  // 移除事件监听
+  off(eventName, callback) {
+    if (this.listeners.has(eventName)) {
+      const filteredListeners = this.listeners.get(eventName).filter(l => l !== callback);
+      this.listeners.set(eventName, filteredListeners);
+    }
+  }
+
+  // 触发事件
+  emit(eventName, data) {
+    if (this.listeners.has(eventName)) {
+      this.listeners.get(eventName).forEach(callback => callback(data));
+    }
   }
 
   // 更新TF数据
@@ -47,6 +71,8 @@ export class TFManager {
         children.push(child_frame_id);
       }
     });
+
+    this.emit('update'); // 数据更新后触发事件
   }
 
   // 获取子节点
