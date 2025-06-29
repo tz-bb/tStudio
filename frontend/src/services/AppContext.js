@@ -18,13 +18,19 @@ export const AppProvider = ({ children }) => {
   const [tfHierarchy, setTfHierarchy] = useState(new Map());
   const [debugInfo, setDebugInfo] = useState([]); // Add debug info state
 
-  // Add debug info function
+  // Add debug info function with message aggregation
   const addDebugInfo = (message, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
-    setDebugInfo(prev => [
-        { timestamp, message, type },
-        ...prev.slice(0, 99) // Keep last 100 entries
-    ]);
+    setDebugInfo(prev => {
+      if (prev.length > 0 && prev[0].message === message && prev[0].type === type) {
+        const newFirst = { ...prev[0], count: prev[0].count + 1, timestamp };
+        return [newFirst, ...prev.slice(1)];
+      }
+      return [
+        { timestamp, message, type, count: 1 },
+        ...prev.slice(0, 99) // Keep last 100 unique entries
+      ];
+    });
   };
 
   useEffect(() => {
@@ -32,7 +38,10 @@ export const AppProvider = ({ children }) => {
   }, [subscribedTopics]);
 
   useEffect(() => {
-    const handleConnectionStatus = (data) => setConnectionStatus(data);
+    const handleConnectionStatus = (data) => {
+      setConnectionStatus(data);
+      addDebugInfo(`Connection status updated: ${data.connected ? 'Connected' : 'Disconnected'} to ${data.adapter}`, 'system');
+    };
     const handleDataUpdate = (message) => {
       if (message.topic === '/tf' || message.topic === '/tf_static' || message.message_type === 'tf2_msgs/TFMessage') {
         tfManager.updateTF(message.data);
@@ -41,19 +50,34 @@ export const AppProvider = ({ children }) => {
       }
       if (message.topic === '/system_log') {
         addDebugInfo(message.data.message, message.data.level);
+      } else {
+        addDebugInfo(`Data received on topic: ${message.topic}`, 'data');
       }
       if (subscribedTopicsRef.current.has(message.topic)) {
         setSceneData(prev => ({ ...prev, [message.topic]: message }));
       }
     };
-    const handleTopicSubscribed = (data) => setSubscribedTopics(prev => new Set([...prev, data.topic]));
+    const handleTopicSubscribed = (data) => {
+      setSubscribedTopics(prev => new Set([...prev, data.topic]));
+      addDebugInfo(`Subscribed to topic: ${data.topic}`, 'system');
+    };
     const handleTopicUnsubscribed = (data) => {
       setSubscribedTopics(prev => { const newSet = new Set(prev); newSet.delete(data.topic); return newSet; });
       setSceneData(prev => { const newSceneData = { ...prev }; delete newSceneData[data.topic]; return newSceneData; });
+      addDebugInfo(`Unsubscribed from topic: ${data.topic}`, 'system');
     };
-    const handleWebSocketConnected = () => setWsStatus('connected');
-    const handleWebSocketDisconnected = () => setWsStatus('disconnected');
-    const handleWebSocketError = () => setWsStatus('error');
+    const handleWebSocketConnected = () => {
+      setWsStatus('connected');
+      addDebugInfo('WebSocket connected', 'success');
+    };
+    const handleWebSocketDisconnected = () => {
+      setWsStatus('disconnected');
+      addDebugInfo('WebSocket disconnected', 'warning');
+    };
+    const handleWebSocketError = () => {
+      setWsStatus('error');
+      addDebugInfo('WebSocket error', 'error');
+    };
 
     // Add these handlers
     const handleSystemMessage = (data) => {

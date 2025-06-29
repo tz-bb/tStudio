@@ -11,7 +11,6 @@ const Frame = ({ frameId }) => {
   useFrame(() => {
     if (groupRef.current) {
       const frameData = tfManager.frames.get(frameId);
-      console.log("in useFrame", frameId, frameData)
       if (frameData && frameData.transform) {
         const { translation, rotation } = frameData.transform;
         groupRef.current.position.copy(translation);
