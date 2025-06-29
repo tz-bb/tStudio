@@ -1,0 +1,90 @@
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.dialog-content {
+  background: #2d2d2d;
+  border-radius: 8px;
+  padding: 20px;
+  min-width: 300px;
+  max-width: 500px;
+  color: white;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.dialog-content h3 {
+  margin: 0 0 20px 0;
+  color: #ffffff;
+}
+
+.dialog-body {
+  margin-bottom: 20px;
+}
+
+.dialog-body label {
+  display: block;
+  margin-bottom: 8px;
+  color: #cccccc;
+}
+
+.dialog-body input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #1a1a1a;
+  color: white;
+  font-size: 14px;
+}
+
+.dialog-body input:focus {
+  outline: none;
+  border-color: #007acc;
+}
+
+.error-message {
+  color: #ff6b6b;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.dialog-actions button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn-cancel {
+  background: #666;
+  color: white;
+}
+
+.btn-cancel:hover {
+  background: #777;
+}
+
+.btn-save {
+  background: #007acc;
+  color: white;
+}
+
+.btn-save:hover {
+  background: #005a9e;
+}

@@ -116,3 +116,9 @@ class ParameterManager:
                 print(f"[AutoBackup] Restored and cleared for '{config_name}'")
             return success
         return False
+
+    # 在ParameterManager类中添加
+    
+    async def delete_config(self, name: str) -> bool:
+        """删除指定的配置文件。"""
+        return await self.adapter.delete_config(name)

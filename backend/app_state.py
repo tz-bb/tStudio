@@ -1,5 +1,5 @@
+from params.category_manager import CategoryParameterManager
 from core.data_source_manager import DataSourceManager
-from params.parameter_manager import ParameterManager
 from fastapi import WebSocket
 from typing import List
 import json
@@ -28,4 +28,4 @@ class ConnectionManager:
 # 这些对象将在整个应用中共享
 manager = ConnectionManager()
 data_source_manager = DataSourceManager()
-param_manager = ParameterManager()
+param_manager = CategoryParameterManager()  # 使用CategoryParameterManager

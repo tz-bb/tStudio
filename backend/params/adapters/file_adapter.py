@@ -13,12 +13,13 @@ PROJECT_ROOT = os.path.abspath(os.path.join(BACKEND_DIR, '..', '..'))
 class FileParameterAdapter(BaseParameterAdapter):
     """从本地文件系统加载/保存JSON格式的参数配置。"""
 
-    def __init__(self, config_dir: str = "configs"):
+    def __init__(self, config_dir: str = "configs", category: str = "system"):
         self.base_dir = os.path.join(PROJECT_ROOT, config_dir)
-        self.active_dir = os.path.join(self.base_dir, "active")
-        self.backup_dir = os.path.join(self.base_dir, "backups")
+        self.category = category
+        self.active_dir = os.path.join(self.base_dir, category, "active")
+        self.backup_dir = os.path.join(self.base_dir, category, "backups")
         
-        print(f"[FileParameterAdapter] Initialized. Active directory: {self.active_dir}")
+        print(f"[FileParameterAdapter] Initialized for category '{category}'. Active directory: {self.active_dir}")
         os.makedirs(self.active_dir, exist_ok=True)
         os.makedirs(self.backup_dir, exist_ok=True)
 

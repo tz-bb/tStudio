@@ -1,0 +1,126 @@
+{
+    "global": {
+        "tabEnablePopout": true
+    },
+    "borders": [],
+    "layout": {
+        "type": "row",
+        "id": "#cdcf2ada-f912-416f-9643-ed8f19ffc553",
+        "children": [
+            {
+                "type": "tabset",
+                "id": "#12ad6b0c-9eb8-4c90-8ea6-fe0a0c611b50",
+                "weight": 20,
+                "children": [
+                    {
+                        "type": "tab",
+                        "id": "#9f08bc09-232d-442d-9442-78ea871d6c8e",
+                        "name": "Controls",
+                        "component": "control-panel"
+                    }
+                ]
+            },
+            {
+                "type": "row",
+                "id": "#1ee298b8-7548-40bc-ab33-7969d716f35e",
+                "weight": 30,
+                "children": [
+                    {
+                        "type": "tabset",
+                        "id": "main-tabset",
+                        "weight": 50,
+                        "children": [
+                            {
+                                "type": "tab",
+                                "id": "#680478b3-5e2a-498a-bfcd-690f99c21c76",
+                                "name": "3D Scene",
+                                "component": "scene-3d"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "tabset",
+                        "id": "#f1d2f8b9-4f46-4b23-aee1-bfb3a254427f",
+                        "weight": 50,
+                        "children": [
+                            {
+                                "type": "tab",
+                                "id": "#cac51ec3-4978-4957-87dc-ca5c4ed7c5d0",
+                                "name": "3D Scene",
+                                "component": "scene-3d"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "type": "row",
+                "id": "#73544fa4-d761-4549-9a42-d26662ad6df3",
+                "weight": 30,
+                "children": [
+                    {
+                        "type": "tabset",
+                        "id": "#91feddee-751f-4507-80ce-00d8773e1a58",
+                        "weight": 50,
+                        "children": [
+                            {
+                                "type": "tab",
+                                "id": "#d4b6c45e-8aeb-47c3-8906-9842f62af90f",
+                                "name": "3D Scene",
+                                "component": "scene-3d"
+                            }
+                        ],
+                        "active": true
+                    },
+                    {
+                        "type": "tabset",
+                        "id": "#7c1c51e1-fe48-4623-a284-4d4ef79c04ea",
+                        "weight": 50,
+                        "children": [
+                            {
+                                "type": "tab",
+                                "id": "#24c4bb2e-695c-4427-9bad-831f1401a5f6",
+                                "name": "3D Scene",
+                                "component": "scene-3d"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "type": "row",
+                "id": "#f41b28b7-6078-4fed-b255-eda0135c22d4",
+                "weight": 20,
+                "children": [
+                    {
+                        "type": "tabset",
+                        "id": "#67695e51-52d9-49f8-8815-88ef5a522525",
+                        "weight": 50,
+                        "children": [
+                            {
+                                "type": "tab",
+                                "id": "#a12dfb30-221b-4f2b-abc5-f3719e84ea5c",
+                                "name": "TF Tree",
+                                "component": "tf-panel"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "tabset",
+                        "id": "#a58b4dad-8e44-4838-8ad9-5413a26f9c9f",
+                        "weight": 50,
+                        "children": [
+                            {
+                                "type": "tab",
+                                "id": "#cc3017c6-8c85-4ed4-b5e8-0d9751eccd29",
+                                "name": "System Log",
+                                "component": "debug-info"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    "popouts": {}
+}
