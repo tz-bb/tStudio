@@ -48,7 +48,7 @@ function ConnectionPanel({ connectionStatus, wsManager }) {
   };
 
   const renderConfigField = (field) => {
-    const value = config[field.name] || field.default;
+    const value = config[field.name] ?? field.default;
     
     switch (field.type) {
       case 'text':

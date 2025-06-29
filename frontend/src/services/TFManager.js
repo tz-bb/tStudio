@@ -35,17 +35,28 @@ export class TFManager {
   updateTF(tfData) {
     tfData.transforms.forEach(transform => {
       const { header, child_frame_id, transform: tf } = transform;
+      const parentFrameId = header.frame_id;
+
+      // 确保父节点也存在于frames中
+      if (parentFrameId && !this.frames.has(parentFrameId)) {
+        this.frames.set(parentFrameId, {
+          parent: null, // 显式表示没有父节点
+          transform: {
+            translation: new THREE.Vector3(0, 0, 0),
+            rotation: new THREE.Quaternion(0, 0, 0, 1),
+          },
+          timestamp: header.stamp
+        });
+      }
       
       this.frames.set(child_frame_id, {
-        parent: header.frame_id,
+        parent: parentFrameId,
         transform: {
           translation: new THREE.Vector3(tf.translation.x, tf.translation.y, tf.translation.z),
           rotation: new THREE.Quaternion(tf.rotation.x, tf.rotation.y, tf.rotation.z, tf.rotation.w),
         },
         timestamp: header.stamp
       });
-      
-      const parentFrameId = header.frame_id;
       
       // 更新父子关系
       const oldParent = this.frameHierarchy.get(child_frame_id);

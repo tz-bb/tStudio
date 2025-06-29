@@ -5,6 +5,7 @@ import { useAppContext } from '../services/AppContext';
 
 // 渲染TF树的递归组件
 const FrameNode = React.memo(({ frameId, hierarchy, level, onSelect, selectedFrame }) => {
+  const [expanded, setExpanded] = useState(true);
   const children = useMemo(() => 
     Array.from(hierarchy.entries())
       .filter(([, parent]) => parent === frameId)
@@ -13,14 +14,22 @@ const FrameNode = React.memo(({ frameId, hierarchy, level, onSelect, selectedFra
   );
 
   return (
-    <div style={{ marginLeft: level * 20 }}>
+    <div className="frame-node" style={{ paddingLeft: `20px` }}>
       <div 
         className={`frame-item ${selectedFrame === frameId ? 'selected' : ''}`}
         onClick={() => onSelect(frameId)}
       >
-        📍 {frameId}
+        <span 
+          className="toggle-icon"
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded(!expanded);
+          }}
+        >
+          {children.length > 0 ? (expanded ? '▼' : '▶') : ''}📍 {frameId}
+        </span>
       </div>
-      {children.map(child => (
+      {expanded && children.map(child => (
         <FrameNode 
           key={child} 
           frameId={child} 

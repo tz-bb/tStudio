@@ -16,19 +16,34 @@
   padding: 8px;
 }
 
-.frame-item {
-  padding: 4px 8px;
-  cursor: pointer;
-  border-radius: 4px;
+.frame-node {
   margin: 2px 0;
 }
 
+.frame-item {
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: background-color 0.2s;
+}
+
 .frame-item:hover {
-  background: #444;
+  background-color: #4a4a4a;
 }
 
 .frame-item.selected {
-  background: #4a90e2;
+  background-color: #5a6a9c;
+  color: white;
+}
+
+.toggle-icon {
+  margin-right: 6px;
+  width: 16px;
+  display: inline-block;
+  cursor: pointer;
+  flex-grow: 1;
 }
 
 .transform-controls {
