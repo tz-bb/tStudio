@@ -10,7 +10,7 @@ class ParameterService {
     
     // 布局相关方法 - 使用新的分类API路径
     static async listLayouts() {
-        const response = await fetch(`${API_BASE_URL}/configs/category/layouts`);
+        const response = await fetch(`${API_BASE_URL}/configs/layouts`);
         if (!response.ok) {
             throw new Error(`Failed to fetch layouts: ${response.statusText}`);
         }
@@ -19,7 +19,7 @@ class ParameterService {
     }
 
     static async saveLayout(name, layoutData) {
-        const response = await fetch(`${API_BASE_URL}/configs/category/layouts`, {
+        const response = await fetch(`${API_BASE_URL}/configs/layouts`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -38,7 +38,7 @@ class ParameterService {
     }
 
     static async loadLayout(name) {
-        const response = await fetch(`${API_BASE_URL}/configs/category/layouts/${name}`);
+        const response = await fetch(`${API_BASE_URL}/configs/layouts/${name}`);
         if (!response.ok) {
             throw new Error(`Failed to load layout: ${response.statusText}`);
         }
@@ -46,7 +46,7 @@ class ParameterService {
     }
 
     static async deleteLayout(name) {
-        const response = await fetch(`${API_BASE_URL}/configs/category/layouts/${name}`, {
+        const response = await fetch(`${API_BASE_URL}/configs/layouts/${name}`, {
             method: 'DELETE'
         });
         

@@ -22,7 +22,7 @@
             },
             {
                 "type": "row",
-                "id": "#1ee298b8-7548-40bc-ab33-7969d716f35e",
+                "id": "#58e8f7d7-8c18-4b7b-9374-71bc1892fe5d",
                 "weight": 30,
                 "children": [
                     {
@@ -40,16 +40,17 @@
                     },
                     {
                         "type": "tabset",
-                        "id": "#f1d2f8b9-4f46-4b23-aee1-bfb3a254427f",
+                        "id": "#94b1558a-15df-44a3-9a16-ac2bd1182573",
                         "weight": 50,
                         "children": [
                             {
                                 "type": "tab",
-                                "id": "#cac51ec3-4978-4957-87dc-ca5c4ed7c5d0",
+                                "id": "#a30d08ea-ae61-4f64-8ad7-22aa5c66730b",
                                 "name": "3D Scene",
                                 "component": "scene-3d"
                             }
-                        ]
+                        ],
+                        "active": true
                     }
                 ]
             },
@@ -69,8 +70,7 @@
                                 "name": "3D Scene",
                                 "component": "scene-3d"
                             }
-                        ],
-                        "active": true
+                        ]
                     },
                     {
                         "type": "tabset",

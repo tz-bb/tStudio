@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 import sys
 import os
+import shutil
 import json
 
 # 将 'backend' 目录添加到Python的模块搜索路径中
@@ -9,210 +10,188 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from main import app
 
-# 定义一个可复用的TestClient fixture
+# --- 测试常量 ---
+TEST_CATEGORY = "test_suite_category"
+TEST_CONFIG_NAME = "test_config"
+# 修正路径以包含 'active' 子目录
+TEST_ACTIVE_DIR = os.path.join("configs", TEST_CATEGORY, "active")
+TEST_CATEGORY_DIR = os.path.join("configs", TEST_CATEGORY)
+
+# --- 测试 Fixtures ---
 @pytest.fixture(scope="module")
 def client():
+    """创建一个可复用的TestClient实例。"""
     with TestClient(app) as c:
         yield c
 
-# --- 测试参数配置 --- #
+@pytest.fixture(scope="module", autouse=True)
+def setup_and_teardown_test_environment():
+    """在模块测试开始前创建测试目录和配置，在结束后清理。"""
+    # Setup: 创建测试目录，包括 active 子目录
+    if os.path.exists(TEST_CATEGORY_DIR):
+        shutil.rmtree(TEST_CATEGORY_DIR)
+    os.makedirs(TEST_ACTIVE_DIR)
 
-def test_get_all_configs(client: TestClient):
-    """测试获取所有参数配置"""
-    response = client.get("/api/params/configs")
-    assert response.status_code == 200
-    data = response.json()
-    assert "configs" in data
-    assert isinstance(data["configs"], list)
-    # 默认应该有一个 'default' 配置
-    assert "default" in data["configs"]
+    # 创建一个初始配置文件
+    initial_data = {
+        "group1": {
+            "param1": {"value": 123, "type": "number", "metadata": {"type": "number"}}
+        }
+    }
+    # 在 active 目录中创建文件
+    with open(os.path.join(TEST_ACTIVE_DIR, f"{TEST_CONFIG_NAME}.json"), 'w') as f:
+        json.dump(initial_data, f)
 
-def test_get_specific_config(client: TestClient):
-    """测试获取指定的参数配置"""
-    response = client.get("/api/params/configs/default")
+    yield  # 测试运行
+
+    # Teardown: 清理整个测试类别目录
+    if os.path.exists(TEST_CATEGORY_DIR):
+        shutil.rmtree(TEST_CATEGORY_DIR)
+
+# --- 参数类型API测试 ---
+def test_get_param_types(client: TestClient):
+    """测试获取所有参数类型。"""
+    response = client.get("/api/params/types")
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, dict)
+    assert "string" in data
+    assert "number" in data
+    assert "default_value" in data["string"]
 
-def test_get_non_existent_config(client: TestClient):
-    """测试获取一个不存在的配置，应该返回404"""
-    response = client.get("/api/params/configs/non_existent_config")
+def test_get_specific_param_type_template(client: TestClient):
+    """测试获取特定参数类型的模板。"""
+    response = client.get("/api/params/types/number")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["value"] == 0
+    assert data["type"] == "number"
+
+def test_get_non_existent_param_type(client: TestClient):
+    """测试获取不存在的参数类型。"""
+    response = client.get("/api/params/types/non_existent_type")
     assert response.status_code == 404
 
-# --- 测试单个参数操作 --- #
-
-TEST_CONFIG_NAME = "test_suite_config"
-
-@pytest.fixture(scope="module", autouse=True)
-def setup_and_teardown_test_config(client: TestClient):
-    """在测试开始前创建一个测试配置，在结束后删除它"""
-    # Setup: 创建一个新的配置文件用于测试
-    initial_data = {
-        "name": TEST_CONFIG_NAME,
-        "data": {
-            "group1": {
-                "param1": {"__value__": 123, "__metadata__": {"type": "number"}}
-            }
-        }
-    }
-    client.post("/api/params/configs", json=initial_data)
-    
-    yield # 这里是测试运行的地方
-    
-    # Teardown: 删除测试配置文件
-    # 注意：实际项目中，删除操作可能需要一个专门的API端点
-    # 这里我们假设没有删除配置文件的API，所以手动清理或在测试适配器中处理
-    # 为简单起见，我们暂时不实现删除
-    pass
-
-def test_update_parameter(client: TestClient):
-    """测试更新单个参数"""
-    update_payload = {
-        "path": "group1.param1",
-        "value": 456
-    }
-    response = client.patch(f"/api/params/configs/{TEST_CONFIG_NAME}/params", json=update_payload)
+# --- 配置管理API测试 ---
+def test_list_configs_by_category(client: TestClient):
+    """测试按类别列出配置。"""
+    response = client.get(f"/api/params/configs/{TEST_CATEGORY}")
     assert response.status_code == 200
-    
-    # 验证参数是否真的被更新
-    response = client.get(f"/api/params/configs/{TEST_CONFIG_NAME}")
     data = response.json()
-    assert data["group1"]["param1"]["__value__"] == 456
+    assert data["category"] == TEST_CATEGORY
+    assert TEST_CONFIG_NAME in data["configs"]
 
-def test_add_parameter(client: TestClient):
-    """测试添加一个新参数"""
-    add_payload = {
-        "path": "group1.param2",
-        "type": "string" # 使用新的API格式
-    }
-    response = client.post(f"/api/params/configs/{TEST_CONFIG_NAME}/params", json=add_payload)
+def test_get_specific_config(client: TestClient):
+    """测试获取指定的参数配置。"""
+    response = client.get(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}")
     assert response.status_code == 200
+    data = response.json()
+    assert "group1" in data
 
-    # 验证参数是否真的被添加
-    response = client.get(f"/api/params/configs/{TEST_CONFIG_NAME}")
+def test_get_non_existent_config(client: TestClient):
+    """测试获取不存在的配置。"""
+    response = client.get(f"/api/params/configs/{TEST_CATEGORY}/non_existent_config")
+    assert response.status_code == 404
+
+# --- 单个参数操作测试 ---
+def test_add_parameter(client: TestClient):
+    """测试添加一个新参数。"""
+    add_payload = {"path": "group1.param2", "type": "string"}
+    response = client.post(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}/params", json=add_payload)
+    assert response.status_code == 200, response.text
+
+    response = client.get(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}")
     data = response.json()
     assert "param2" in data["group1"]
-    assert data["group1"]["param2"]["__value__"] == ""
+    assert data["group1"]["param2"]["value"] == ""
+
+def test_update_parameter(client: TestClient):
+    """测试更新单个参数。"""
+    update_payload = {"path": "group1.param1", "value": 456}
+    response = client.patch(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}/params", json=update_payload)
+    assert response.status_code == 200, response.text
+
+    response = client.get(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}")
+    data = response.json()
+    assert data["group1"]["param1"]["value"] == 456
 
 def test_delete_parameter(client: TestClient):
-    """测试删除一个参数"""
-    delete_payload = {"path": "group1.param1"}
-    url = f"/api/params/configs/{TEST_CONFIG_NAME}/params"
-    response = client.request("DELETE", url, json=delete_payload)
-    assert response.status_code == 200
+    """测试删除一个参数。"""
+    # 先添加一个确保它存在
+    client.post(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}/params", json={"path": "group1.to_delete", "type": "string"})
 
-    # 验证参数是否真的被删除
-    response = client.get(f"/api/params/configs/{TEST_CONFIG_NAME}")
+    delete_payload = {"path": "group1.to_delete"}
+    response = client.request("DELETE", f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}/params", json=delete_payload)
+    assert response.status_code == 200, response.text
+
+    response = client.get(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}")
     data = response.json()
-    assert "param1" not in data["group1"]
+    assert "to_delete" not in data["group1"]
 
-# --- 测试备份与恢复 --- #
-
+# --- 备份与恢复测试 ---
 def test_backup_and_restore(client: TestClient):
-    """测试创建备份、列出备份和从备份恢复的完整流程"""
-    # 步骤1: 更改一个值，以便我们能验证恢复是否成功
-    original_value = 123
-    changed_value = 999
+    """测试备份和恢复流程。"""
     param_path = "group1.param1"
+    # 获取当前值以确保测试独立性
+    resp = client.get(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}")
+    original_value = resp.json()["group1"]["param1"]["value"]
+    changed_value = original_value + 100
 
-    # 先确保初始值是正确的
-    response = client.get(f"/api/params/configs/{TEST_CONFIG_NAME}")
-    data = response.json()
-    # 注意：因为之前的测试删除了param1，我们可能需要重新添加它或修改fixture
-    # 为了简单起见，我们假设param1在setup时被创建，并且值为123
-    # 如果测试顺序导致它不存在，我们需要调整测试逻辑
-    # 暂时我们假设它存在
-    if 'param1' not in data.get('group1', {}):
-        client.post(f"/api/params/configs/{TEST_CONFIG_NAME}/params", json={"path": param_path, "type": "number"})
-        client.patch(f"/api/params/configs/{TEST_CONFIG_NAME}/params", json={"path": param_path, "value": original_value})
+    # 1. 创建备份
+    response = client.post(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}/backups")
+    assert response.status_code == 200, response.text
+    backup_filename = response.json()["backup_name"]
 
-    # 步骤2: 创建一个手动备份
-    response = client.post(f"/api/params/configs/{TEST_CONFIG_NAME}/backups")
-    assert response.status_code == 200
-    backup_data = response.json()
-    assert backup_data["success"]
-    backup_filename = backup_data["backup_name"]
+    # 2. 修改值
+    client.patch(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}/params", json={"path": param_path, "value": changed_value})
 
-    # 步骤3: 列出备份，并确认我们刚创建的备份在列表中
-    response = client.get(f"/api/params/configs/{TEST_CONFIG_NAME}/backups")
-    assert response.status_code == 200
-    backups_list = response.json()["backups"]
-    assert backup_filename in backups_list
-
-    # 步骤4: 修改参数的值
-    update_payload = {"path": param_path, "value": changed_value}
-    client.patch(f"/api/params/configs/{TEST_CONFIG_NAME}/params", json=update_payload)
-
-    # 验证值是否已更改
-    response = client.get(f"/api/params/configs/{TEST_CONFIG_NAME}")
-    data = response.json()
-    assert data["group1"]["param1"]["__value__"] == changed_value
-
-    # 步骤5: 从备份恢复
+    # 3. 恢复
     restore_payload = {"backup_filename": backup_filename}
-    response = client.post(f"/api/params/configs/{TEST_CONFIG_NAME}/restore", json=restore_payload)
-    assert response.status_code == 200
-    assert response.json()["success"]
+    response = client.post(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}/restore", json=restore_payload)
+    assert response.status_code == 200, response.text
 
-    # 步骤6: 验证值是否已恢复到原始值
-    response = client.get(f"/api/params/configs/{TEST_CONFIG_NAME}")
+    # 4. 验证
+    response = client.get(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}")
     data = response.json()
-    assert data["group1"]["param1"]["__value__"] == original_value
+    assert data["group1"]["param1"]["value"] == original_value
 
-# --- 测试失败和边缘情况 --- #
-
+# --- 边缘情况测试 ---
 def test_update_non_existent_parameter(client: TestClient):
-    """测试更新一个不存在的参数，应该失败"""
+    """测试更新不存在的参数。"""
     update_payload = {"path": "group_non_exist.param_non_exist", "value": 999}
-    response = client.patch(f"/api/params/configs/{TEST_CONFIG_NAME}/params", json=update_payload)
+    response = client.patch(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}/params", json=update_payload)
     assert response.status_code == 400
 
-def test_delete_non_existent_parameter(client: TestClient):
-    """测试删除一个不存在的参数，应该失败"""
-    delete_payload = {"path": "group_non_exist.param_non_exist"}
-    response = client.request("DELETE", f"/api/params/configs/{TEST_CONFIG_NAME}/params", json=delete_payload)
-    assert response.status_code == 400
-
-def test_restore_from_non_existent_backup(client: TestClient):
-    """测试从一个不存在的备份恢复，应该失败"""
-    restore_payload = {"backup_filename": "non_existent_backup.json"}
-    response = client.post(f"/api/params/configs/{TEST_CONFIG_NAME}/restore", json=restore_payload)
-    assert response.status_code == 400
-
-# --- 测试可确认的编辑（自动备份/恢复） --- #
-
+# --- 可确认的编辑测试 ---
 def test_confirmable_edit_flow(client: TestClient):
-    """测试自动备份和恢复流程"""
+    """测试自动备份和恢复流程。"""
     param_path = "group1.param1"
-    
-    # 动态获取当前值，而不是硬编码
-    response = client.get(f"/api/params/configs/{TEST_CONFIG_NAME}")
-    assert response.status_code == 200
-    original_value = response.json()["group1"]["param1"]["__value__"]
-    
-    changed_value = original_value + 100 # 基于当前值进行修改
+    response = client.get(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}")
+    original_value = response.json()["group1"]["param1"]["value"]
+    changed_value = original_value + 50
 
-    # 步骤1: 开始一个可确认的编辑（创建自动备份）
-    response = client.post(f"/api/params/configs/{TEST_CONFIG_NAME}/confirm-start")
-    assert response.status_code == 200
+    # 1. 开始编辑
+    response = client.post(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}/confirm-start")
+    assert response.status_code == 200, response.text
 
-    # 步骤2: 修改参数的值
-    update_payload = {"path": param_path, "value": changed_value}
-    client.patch(f"/api/params/configs/{TEST_CONFIG_NAME}/params", json=update_payload)
-    response = client.get(f"/api/params/configs/{TEST_CONFIG_NAME}")
-    assert response.json()["group1"]["param1"]["__value__"] == changed_value
+    # 2. 修改
+    client.patch(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}/params", json={"path": param_path, "value": changed_value})
 
-    # 步骤3: 撤销修改（从自动备份恢复）
-    response = client.post(f"/api/params/configs/{TEST_CONFIG_NAME}/confirm-revert")
-    assert response.status_code == 200
+    # 3. 撤销
+    response = client.post(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}/confirm-revert")
+    assert response.status_code == 200, response.text
 
-    # 步骤4: 验证值是否已恢复
-    response = client.get(f"/api/params/configs/{TEST_CONFIG_NAME}")
-    assert response.json()["group1"]["param1"]["__value__"] == original_value
+    # 4. 验证
+    response = client.get(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}")
+    assert response.json()["group1"]["param1"]["value"] == original_value
+
+    # 5. 结束编辑会话，清理自动备份
+    response = client.post(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}/confirm-end")
+    assert response.status_code == 200, response.text
+
 
 def test_revert_without_auto_backup(client: TestClient):
-    """在没有自动备份的情况下尝试恢复，应该失败"""
-    # 确保没有自动备份存在（这可能需要清理操作，或在一个干净的状态下运行）
-    # 为简单起见，我们直接调用revert，并期望它失败
-    response = client.post(f"/api/params/configs/{TEST_CONFIG_NAME}/confirm-revert")
+    """在没有自动备份的情况下尝试恢复。"""
+    # 在一个干净的状态下，没有自动备份存在
+    response = client.post(f"/api/params/configs/{TEST_CATEGORY}/{TEST_CONFIG_NAME}/confirm-revert")
     assert response.status_code == 400

@@ -53,14 +53,30 @@ class FileParameterAdapter(BaseParameterAdapter):
             print(f"Error saving config '{name}': {e}")
             return False
 
-    async def create_backup(self, name: str) -> str:
+    async def delete_config(self, name: str) -> bool:
+        """删除指定的活动配置文件。"""
+        file_path = self._get_path(name)
+        if not os.path.exists(file_path):
+            return False
+        try:
+            os.remove(file_path)
+            return True
+        except Exception as e:
+            print(f"Error deleting config '{name}': {e}")
+            return False
+
+    async def create_backup(self, name: str, is_auto: bool = False) -> str:
         """为指定的配置文件创建一个时间戳备份。"""
         source_path = self._get_path(name)
         if not os.path.exists(source_path):
             return None
         
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = self._get_path(name, use_backup=True, timestamp=timestamp)
+        if is_auto:
+            backup_name = f"{name}_auto_backup.json"
+            backup_path = os.path.join(self.backup_dir, backup_name)
+        else:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = self._get_path(name, use_backup=True, timestamp=timestamp)
         
         try:
             shutil.copy2(source_path, backup_path)

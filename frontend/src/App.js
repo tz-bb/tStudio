@@ -75,6 +75,7 @@ const App = () => {
   const [availableLayouts, setAvailableLayouts] = useState([]);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [currentLayoutName, setCurrentLayoutName] = useState(null); // 新增 state
   const layoutRef = useRef();
   const saveTimeoutRef = useRef();
 
@@ -92,8 +93,9 @@ const App = () => {
   useEffect(() => {
     const loadLayout = async () => {
       try {
-        const savedLayout = await ParameterService.loadLayout('default');
+        const savedLayout = await ParameterService.loadLayout('auto_save');
         setModel(Model.fromJson(savedLayout));
+        setCurrentLayoutName('auto_save'); // 初始加载也设置名称
       } catch (error) {
         console.warn('Failed to load saved layout, using default.', error);
         setModel(Model.fromJson(initialJson));
@@ -112,7 +114,7 @@ const App = () => {
     
     saveTimeoutRef.current = setTimeout(async () => {
       try {
-        await ParameterService.saveLayout('default', layoutData);
+        await ParameterService.saveLayout('auto_save', layoutData);
         setHasUnsavedChanges(false);
       } catch (error) {
         console.error('Failed to auto-save layout:', error);
@@ -133,6 +135,7 @@ const App = () => {
     try {
       await ParameterService.saveLayout(layoutName, model.toJson());
       await loadAvailableLayouts(); // 刷新布局列表
+      setCurrentLayoutName(layoutName); // 保存后更新当前布局名称
       alert(`布局 "${layoutName}" 保存成功！`);
     } catch (error) {
       console.error('Failed to save layout:', error);
@@ -145,6 +148,7 @@ const App = () => {
     try {
       const layoutData = await ParameterService.loadLayout(layoutName);
       setModel(Model.fromJson(layoutData));
+      setCurrentLayoutName(layoutName); // 加载后更新当前布局名称
       setHasUnsavedChanges(false);
     } catch (error) {
       console.error('Failed to load layout:', error);
@@ -158,7 +162,17 @@ const App = () => {
       return;
     }
     setModel(Model.fromJson(initialJson));
+    setCurrentLayoutName(null); // 重置后清除当前布局名称
     setHasUnsavedChanges(true);
+  };
+
+  // 新增：覆盖当前布局
+  const handleOverwriteLayout = async () => {
+    if (!currentLayoutName || !model) return;
+    if (!window.confirm(`确定要覆盖布局 "${currentLayoutName}" 吗？`)) {
+      return;
+    }
+    handleSaveLayout(currentLayoutName);
   };
 
   const factory = (node) => {
@@ -192,6 +206,9 @@ const App = () => {
                       Layout {hasUnsavedChanges && '*'}
                     </button>
                     <div className="dropdown-content">
+                        {currentLayoutName && currentLayoutName !== 'auto_save' && (
+                          <a href="#" onClick={handleOverwriteLayout}>Overwrite '{currentLayoutName}'</a>
+                        )}
                         <a href="#" onClick={() => setShowSaveDialog(true)}>Save Layout As...</a>
                         <hr />
                         <a href="#" onClick={handleResetLayout}>Reset to Default</a>
