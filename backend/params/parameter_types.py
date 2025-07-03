@@ -1,67 +1,164 @@
-from typing import Dict, Any, List, Union
-from pydantic import BaseModel, Field
+from __future__ import annotations
+import copy
+from typing import Any, Dict, Optional, List, Union
 
-# --- 1. 定义参数的基本结构 ---
-
-class Parameter(BaseModel):
-    """参数实例的基础模型"""
-    value: Any
-    type: str
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-
-# --- 2. 定义类型模板 ---
-
-class TypeDefinition(BaseModel):
-    """参数类型的定义模板"""
-    default_value: Any
-    metadata_template: Dict[str, Any] = Field(default_factory=dict)
-
-# --- 3. 类型注册表 (使用新的结构) ---
-
-PARAMETER_TYPE_DEFINITIONS: Dict[str, TypeDefinition] = {
-    "string": TypeDefinition(
-        default_value="",
-        metadata_template={"type": "string", "description": "A string value.", "ui_hint": "textfield"}
-    ),
-    "number": TypeDefinition(
-        default_value=0,
-        metadata_template={"type": "number", "description": "A numerical value.", "range": [None, None], "ui_hint": "slider"}
-    ),
-    "boolean": TypeDefinition(
-        default_value=False,
-        metadata_template={"type": "boolean", "description": "A boolean value.", "ui_hint": "switch"}
-    ),
-    "color_hex": TypeDefinition(
-        default_value="#FFFFFF",
-        metadata_template={"type": "string", "description": "A color value in hexadecimal format.", "ui_hint": "color_picker"}
-    ),
-    "dict": TypeDefinition(
-        default_value={},
-        metadata_template={"type": "object", "description": "A dictionary of key-value pairs.", "ui_hint": "dict_editor"}
-    ),
-    "list": TypeDefinition(
-        default_value=[],
-        metadata_template={"type": "array", "description": "A list of items.", "ui_hint": "list_editor"}
-    )
+# 保持现有的类型定义，它们在新节点创建时依然有用
+PARAMETER_TYPE_DEFINITIONS = {
+    "string": {"default": "", "metadata": {}},
+    "number": {"default": 0, "metadata": {"min": -1e9, "max": 1e9, "step": 0.1}},
+    "boolean": {"default": False, "metadata": {}},
+    "color": {"default": "#00000000", "metadata": {}},
+    "vector2": {"default": [0.0, 0.0], "metadata": {}},
+    "vector3": {"default": [0.0, 0.0, 0.0], "metadata": {}},
 }
 
-# --- 4. 参数创建工具函数 ---
+class ParamNode:
+    """A unified node in the parameter tree. It can represent both a group and a value."""
+    def __init__(self, name: str, parent: Optional[ParamNode] = None, value: Any = None, metadata: Optional[Dict] = None):
+        self.name = name
+        self.parent = parent
+        self.children: Dict[str, ParamNode] = {}
+        self._value = value
+        self.metadata = metadata if metadata is not None else {}
 
-def create_parameter(param_type: str, value: Any = None) -> Parameter:
-    """根据类型创建一个新的参数实例"""
-    definition = PARAMETER_TYPE_DEFINITIONS.get(param_type)
-    if not definition:
+    @property
+    def path_list(self) -> List[str]:
+        """Returns the full path of the node from the root as a list of keys."""
+        if self.parent and self.parent.name != "__root__":
+            return self.parent.path_list + [self.name]
+        return [self.name]
+
+    @property
+    def is_value_node(self) -> bool:
+        """A node is a value node if it has an explicit value."""
+        return self._value is not None
+
+    @property
+    def value(self) -> Any:
+        """Gets the value."""
+        return self._value
+
+    @value.setter
+    def value(self, new_value: Any):
+        """Sets the value."""
+        self._value = new_value
+
+    @property
+    def metadata(self) -> Dict:
+        """Gets the metadata."""
+        return self._metadata
+
+    @metadata.setter
+    def metadata(self, new_metadata: Dict):
+        """Sets the metadata."""
+        self._metadata = new_metadata
+
+    def add_child(self, child_node: ParamNode):
+        """Adds a child node."""
+        if child_node.name in self.children:
+            raise ValueError(f"Child with name '{child_node.name}' already exists in '{self.name}'")
+        child_node.parent = self
+        self.children[child_node.name] = child_node
+
+    def remove_child(self, child_name: str):
+        """Removes a child node by name."""
+        if child_name in self.children:
+            del self.children[child_name]
+        else:
+            raise KeyError(f"No child with name '{child_name}' in '{self.name}'")
+
+    def get_child(self, path: Union[str, List[str]]) -> Optional[ParamNode]:
+        """Retrieves a descendant node using a dot-separated path or a list of keys."""
+        if isinstance(path, str):
+            path_list = path.split('.') if path else []
+        else:
+            path_list = path
+
+        if not path_list:
+            return self
+        
+        current_node = self
+        for key in path_list:
+            if current_node and key in current_node.children:
+                current_node = current_node.children[key]
+            else:
+                return None
+        return current_node
+
+    def to_dict(self) -> Any:
+        """Converts the node and its descendants back to a dictionary format with metadata."""
+        # If it's a simple value node with no children or metadata, return the raw value.
+        if self.is_value_node and not self.children and not self.metadata:
+            return self.value
+
+        data = {}
+        if self.is_value_node:
+            data['__value__'] = self.value
+        if self.metadata:
+            data['__metadata__'] = self.metadata
+        
+        for child_name, child_node in self.children.items():
+            data[child_name] = child_node.to_dict()
+            
+        # If the node was just a value with metadata, the dict is already complete.
+        # If it was a group, the children are added. If empty, it's an empty group.
+        return data
+
+    def to_clean_dict(self) -> Any:
+        """Converts the node and its descendants to a clean dictionary, omitting internal fields."""
+        if self.is_value_node and not self.children:
+            return self.value
+
+        data = {}
+        if self.is_value_node:
+            # This case handles nodes that are both a value and a group.
+            # We can decide on a special key, e.g., `__self__`, or omit it.
+            # For now, let's assume such mixed nodes are not standard.
+            pass
+
+        for child_name, child_node in self.children.items():
+            data[child_name] = child_node.to_clean_dict()
+
+        return data
+
+    def __repr__(self) -> str:
+        return f"ParamNode(name='{self.name}', value={self._value}, children={list(self.children.keys())})"
+
+def build_param_tree(data: Any, name: str = "__root__", parent: Optional[ParamNode] = None) -> ParamNode:
+    """Recursively builds a ParamNode tree from a dictionary or a raw value."""
+    if not isinstance(data, dict):
+        # If the data itself is a raw value, create a single value node.
+        return ParamNode(name=name, parent=parent, value=data)
+
+    value = data.get('__value__')
+    metadata = data.get('__metadata__')
+    is_value_node = '__value__' in data
+
+    node = ParamNode(name=name, parent=parent, value=value if is_value_node else None, metadata=metadata)
+    
+    for key, val in data.items():
+        if key.startswith('__'):
+            continue
+        # The child's value is the raw `val`, which could be a dict or a primitive.
+        child_node = build_param_tree(val, name=key, parent=node)
+        node.add_child(child_node)
+            
+    return node
+
+def create_parameter(param_type: str, name: str, value: Any = "__SENTINEL__") -> ParamNode:
+    """Creates a new ParamNode with default metadata for a given type."""
+    if param_type not in PARAMETER_TYPE_DEFINITIONS:
         raise ValueError(f"Unknown parameter type: {param_type}")
     
-    # 如果没有提供初始值，则使用类型的默认值
-    initial_value = value if value is not None else definition.default_value
+    type_def = PARAMETER_TYPE_DEFINITIONS[param_type]
     
-    return Parameter(
-        value=initial_value,
-        type=param_type,
-        metadata=definition.metadata_template.copy()
-    )
+    final_value = value if value != "__SENTINEL__" else type_def['default']
+    
+    metadata = type_def['metadata'].copy()
+    metadata['type'] = param_type
+    
+    return ParamNode(name=name, value=final_value, metadata=metadata)
 
-def get_type_definitions() -> Dict[str, Dict[str, Any]]:
-    """获取所有类型定义的字典"""
-    return {name: definition.model_dump() for name, definition in PARAMETER_TYPE_DEFINITIONS.items()}
+def get_type_definitions() -> Dict[str, Any]:
+    """Returns the dictionary of all registered type definitions."""
+    return PARAMETER_TYPE_DEFINITIONS

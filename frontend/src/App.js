@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Layout, Model, Actions } from 'flexlayout-react';
+import { Layout as FlexLayout, Model } from 'flexlayout-react';
+import { ConfigProvider, theme, Menu, Dropdown, Button, Space } from 'antd';
+import { DownOutlined, SaveOutlined, FolderOpenOutlined, RedoOutlined, PlusOutlined } from '@ant-design/icons';
 import registry from './ui-plugins';
 import { AppProvider } from './services/AppContext';
-import ParameterService from './services/ParameterService';  // 改为默认导入
+import ParameterService from './services/ParameterService';
 import SaveLayoutDialog from './components/SaveLayoutDialog';
 
 import 'flexlayout-react/style/dark.css';
@@ -48,6 +50,11 @@ const initialJson = {
                 children: [
                     {
                         type: 'tab',
+                        name: 'Config Panel',
+                        component: 'config-panel',
+                    },
+                    {
+                        type: 'tab',
                         name: 'TF Tree',
                         component: 'tf-panel',
                     },
@@ -82,6 +89,7 @@ const App = () => {
   // 加载可用布局列表
   const loadAvailableLayouts = useCallback(async () => {
     try {
+      // 使用新的API列出所有布局配置
       const layouts = await ParameterService.listLayouts();
       setAvailableLayouts(layouts);
     } catch (error) {
@@ -93,9 +101,10 @@ const App = () => {
   useEffect(() => {
     const loadLayout = async () => {
       try {
+        // 使用封装好的 loadLayout 方法
         const savedLayout = await ParameterService.loadLayout('auto_save');
-        setModel(Model.fromJson(savedLayout));
-        setCurrentLayoutName('auto_save'); // 初始加载也设置名称
+        setModel(Model.fromJson(savedLayout)); // 从返回的结构中获取布局定义
+        setCurrentLayoutName('auto_save');
       } catch (error) {
         console.warn('Failed to load saved layout, using default.', error);
         setModel(Model.fromJson(initialJson));
@@ -114,6 +123,7 @@ const App = () => {
     
     saveTimeoutRef.current = setTimeout(async () => {
       try {
+        // 自动保存也应该使用 saveLayout
         await ParameterService.saveLayout('auto_save', layoutData);
         setHasUnsavedChanges(false);
       } catch (error) {
@@ -133,6 +143,7 @@ const App = () => {
     if (!model) return;
     
     try {
+      // 直接使用 saveLayout，它会处理创建或更新
       await ParameterService.saveLayout(layoutName, model.toJson());
       await loadAvailableLayouts(); // 刷新布局列表
       setCurrentLayoutName(layoutName); // 保存后更新当前布局名称
@@ -146,11 +157,12 @@ const App = () => {
   // 加载指定布局
   const handleLoadLayout = async (layoutName) => {
     try {
+      // 使用封装好的 loadLayout 方法
       const layoutData = await ParameterService.loadLayout(layoutName);
-      setModel(Model.fromJson(layoutData));
+      setModel(Model.fromJson(layoutData)); // 从返回的结构中获取布局定义
       setCurrentLayoutName(layoutName); // 加载后更新当前布局名称
       setHasUnsavedChanges(false);
-    } catch (error) {
+    } catch (error) { 
       console.error('Failed to load layout:', error);
       alert(`加载布局失败: ${error.message}`);
     }
@@ -187,71 +199,86 @@ const App = () => {
   const onAddWindow = (plugin) => {
     if (!plugin) return;
     layoutRef.current.addTabToActiveTabSet({
-        component: plugin.typeName,
-        name: plugin.name
+      component: plugin.typeName,
+      name: plugin.name,
+      config: plugin.config,
     });
   };
 
-  // 等待model加载完成再渲染
   if (!model) {
-    return <div>Loading Layout...</div>;
+    return <div>Loading layout...</div>;
   }
 
+  const layoutMenu = (
+    <Menu>
+      {currentLayoutName && currentLayoutName !== 'auto_save' && (
+        <Menu.Item key="overwrite" icon={<SaveOutlined />} onClick={handleOverwriteLayout}>
+          Overwrite '{currentLayoutName}'
+        </Menu.Item>
+      )}
+      <Menu.Item key="save_as" icon={<SaveOutlined />} onClick={() => setShowSaveDialog(true)}>
+        Save Layout As...
+      </Menu.Item>
+      <Menu.Divider />
+      <Menu.Item key="reset" icon={<RedoOutlined />} onClick={handleResetLayout}>
+        Reset to Default
+      </Menu.Item>
+      {availableLayouts.length > 0 && <Menu.Divider />}
+      {availableLayouts.map(layout => {
+        const displayName = layout.replace('layout_', '');
+        return (
+          <Menu.Item key={layout} icon={<FolderOpenOutlined />} onClick={() => handleLoadLayout(layout)}>
+            Load: {displayName}
+          </Menu.Item>
+        );
+      })}
+    </Menu>
+  );
+
+  const windowsMenu = (
+    <Menu>
+      {registry.getAllPlugins().map(p => (
+        <Menu.Item key={p.typeName} icon={<PlusOutlined />} onClick={() => onAddWindow(p)}>
+          {p.name}
+        </Menu.Item>
+      ))}
+    </Menu>
+  );
+
   return (
-    <AppProvider>
+    <AppProvider value={{ onAddWindow, availableLayouts, handleLoadLayout, handleSaveLayout, handleResetLayout, handleOverwriteLayout, currentLayoutName, showSaveDialog, setShowSaveDialog }}>
+      <ConfigProvider theme={{ algorithm: theme.darkAlgorithm }}>
         <div className="app-container">
-            <div className="app-menu-bar">
-                <div className="dropdown">
-                    <button className="dropbtn">
-                      Layout {hasUnsavedChanges && '*'}
-                    </button>
-                    <div className="dropdown-content">
-                        {currentLayoutName && currentLayoutName !== 'auto_save' && (
-                          <a href="#" onClick={handleOverwriteLayout}>Overwrite '{currentLayoutName}'</a>
-                        )}
-                        <a href="#" onClick={() => setShowSaveDialog(true)}>Save Layout As...</a>
-                        <hr />
-                        <a href="#" onClick={handleResetLayout}>Reset to Default</a>
-                        {availableLayouts.length > 0 && <hr />}
-                        {availableLayouts.map(layout => {
-                          const displayName = layout.replace('layout_', '');
-                          return (
-                            <a 
-                              href="#" 
-                              key={layout} 
-                              onClick={() => handleLoadLayout(layout)}
-                            >
-                              Load: {displayName}
-                            </a>
-                          );
-                        })}
-                    </div>
-                </div>
-                <div className="dropdown">
-                    <button className="dropbtn">Windows</button>
-                    <div className="dropdown-content">
-                        {registry.getAllPlugins().map(p => (
-                            <a href="#" key={p.typeName} onClick={() => onAddWindow(p)}>{p.name}</a>
-                        ))}
-                    </div>
-                </div>
-            </div>
-            <div className="app-layout">
-                <Layout
-                    ref={layoutRef}
-                    model={model}
-                    factory={factory}
-                    onModelChange={onModelChange}
-                />
-            </div>
-            
-            <SaveLayoutDialog
-              isOpen={showSaveDialog}
-              onClose={() => setShowSaveDialog(false)}
-              onSave={handleSaveLayout}
-              existingLayouts={availableLayouts.map(l => l.replace('layout_', ''))}
+          <div className="app-menu-bar">
+            <Space>
+              <Dropdown overlay={layoutMenu} trigger={['click']}>
+                <Button>
+                  Layout {hasUnsavedChanges && '*'} <DownOutlined />
+                </Button>
+              </Dropdown>
+              <Dropdown overlay={windowsMenu} trigger={['click']}>
+                <Button>
+                  Windows <DownOutlined />
+                </Button>
+              </Dropdown>
+            </Space>
+          </div>
+          <div className="app-layout">
+            <FlexLayout
+              ref={layoutRef}
+              model={model}
+              factory={factory}
+              onModelChange={onModelChange}
             />
+          </div>
+          <SaveLayoutDialog
+            isOpen={showSaveDialog}
+            onClose={() => setShowSaveDialog(false)}
+            onSave={handleSaveLayout}
+            existingLayouts={availableLayouts.map(l => l.replace('layout_', ''))}
+          />
         </div>
+      </ConfigProvider>
     </AppProvider>
   );
 };

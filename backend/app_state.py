@@ -28,4 +28,4 @@ class ConnectionManager:
 # 这些对象将在整个应用中共享
 manager = ConnectionManager()
 data_source_manager = DataSourceManager()
-param_manager = CategoryParameterManager()  # 使用CategoryParameterManager
+param_manager = CategoryParameterManager()
