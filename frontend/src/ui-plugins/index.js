@@ -5,10 +5,12 @@ import { UIPanelPlugin } from './base/UIPanelPlugin';
 // import components
 import TFPanel from '../components/TFPanel';
 import ConfigPanel from '../components/ConfigPanel';
+import NewConfigPage from '../components/NewConfigPage';
 
 const pluginComponentMap = {
   'tf-panel': ["TF Tree", TFPanel],
   'config-panel': ["Config Panel", ConfigPanel],
+  'new-config-page': ["New Config Page", NewConfigPage],
 };
 
 /**

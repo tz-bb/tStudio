@@ -1,14 +1,21 @@
 {
     "visualization": {
         "/tf": {
+            "__value__": 30,
+            "__metadata__":{
+                "type": "number",
+                "min": 20,
+                "max": 60,
+                "step": 1
+            },
             "visible": {
-                "__value__": false,
+                "__value__": true,
                 "__metadata__": {
                     "type": "boolean"
                 }
             },
             "size": {
-                "__value__": 5.1,
+                "__value__": 6.9,
                 "__metadata__": {
                     "type": "number",
                     "min": 0.1,
@@ -25,13 +32,13 @@
                 }
             },
             "color": {
-                "__value__": "#00f2ff",
+                "__value__": "#941111c2",
                 "__metadata__": {
                     "type": "color"
                 }
             },
             "size": {
-                "__value__": 0.05,
+                "__value__": 0.77,
                 "__metadata__": {
                     "type": "number",
                     "min": 0.01,
@@ -44,7 +51,7 @@
     "algorithm_params": {
         "planning_algorithm": {
             "max_speed": {
-                "__value__": 1.6,
+                "__value__": 1.7,
                 "__metadata__": {
                     "type": "number",
                     "min": 0.1,
@@ -53,7 +60,7 @@
                 }
             },
             "tolerance": {
-                "__value__": 0.1,
+                "__value__": 0.35,
                 "__metadata__": {
                     "type": "number",
                     "min": 0.01,

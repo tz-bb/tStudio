@@ -4,6 +4,8 @@ import { RollbackOutlined, SaveOutlined, UndoOutlined, CloudUploadOutlined, Clou
 import ParameterService from '../services/ParameterService';
 import _ from 'lodash';
 
+const ignoreCategories = ['layouts'];
+
 const { Option } = Select;
 const { TabPane } = Tabs;
 
@@ -33,7 +35,8 @@ const ConfigPanel = () => {
             try {
                 setLoading(true);
                 const allConfigs = await ParameterService.listAllConfigs();
-                setConfigs(allConfigs);
+                const filteredConfigs = _.omitBy(allConfigs, (value, key) => ignoreCategories.includes(key));
+                setConfigs(filteredConfigs);
                 setError(null);
             } catch (err) {
                 setError('Failed to load config list.');
@@ -200,7 +203,7 @@ const ConfigPanel = () => {
                                 max={__metadata__.max}
                                 value={typeof __value__ === 'number' ? __value__ : 0}
                                 step={__metadata__.step || 0.1}
-                                onChangeComplete={(val) => handleValueChange(path, val)}
+                                onChange={(val) => handleValueChange(path, val)}
                             />
                         </Col>
                         <Col span={4}>
