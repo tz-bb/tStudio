@@ -18,6 +18,8 @@ export const AppProvider = ({ children }) => {
   const [tfFrames, setTfFrames] = useState(new Map());
   const [tfHierarchy, setTfHierarchy] = useState(new Map());
   const [debugInfo, setDebugInfo] = useState([]); // Add debug info state
+  const [scenePluginTemplates, setScenePluginTemplates] = useState([]);
+  const [scenePluginsInitialized, setScenePluginsInitialized] = useState(false);
 
   // Add debug info function with message aggregation
   const addDebugInfo = (message, type = 'info') => {
@@ -49,7 +51,7 @@ export const AppProvider = ({ children }) => {
         setTfFrames(new Map(tfManager.frames));
         setTfHierarchy(new Map(tfManager.frameHierarchy));
       }
-      if (message.topic === '/system_log') {
+      if (['/system_log','/rosout'].includes(message.topic)) {
         addDebugInfo(message.data.message, message.data.level);
       } else {
         addDebugInfo(`Data received on topic: ${message.topic}`, 'data');
@@ -122,6 +124,10 @@ export const AppProvider = ({ children }) => {
     setSubscribedTopics,
     debugInfo,      // Expose debug info
     addDebugInfo,   // Expose function
+    scenePluginTemplates,
+    setScenePluginTemplates,
+    scenePluginsInitialized,
+    setScenePluginsInitialized,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

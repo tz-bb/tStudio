@@ -1,13 +1,15 @@
-import React, { useMemo, useRef, useEffect, useState } from 'react';
+import React, { useMemo, useRef, useEffect, useState, useContext } from 'react';
 import { initializePlugins } from './plugins';
 import { tfManager } from '../services/TFManager'; // 导入 tfManager
+import { AppContext } from '../services/AppContext';
 
 function Scene3D({ data }) {
   const [pluginManager, setPluginManager] = useState(null);
+  const { setScenePluginTemplates, setScenePluginsInitialized } = useContext(AppContext);
 
   // 初始化插件系统
   useEffect(() => {
-    const manager = initializePlugins();
+    const manager = initializePlugins(setScenePluginTemplates, setScenePluginsInitialized);
     setPluginManager(manager);
 
     // 组件卸载时执行清理

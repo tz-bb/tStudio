@@ -183,17 +183,7 @@ function ImuVisualization({ data }) {
 // IMU插件
 export class ImuPlugin extends VisualizationPlugin {
   constructor() {
-    super('IMU', 15, '1.0.0'); // 高优先级
-  }
-  
-  canHandle(topic, data) {
-    // 检查是否为IMU消息
-    return topic.includes('imu') || 
-           topic.includes('/imu') ||
-           (data && (
-             (data.orientation && data.angular_velocity && data.linear_acceleration) ||
-             (data.header && (data.orientation || data.angular_velocity || data.linear_acceleration))
-           ));
+    super('IMU', "sensor_msgs/Imu", 15, '1.0.0'); // 高优先级
   }
   
   render(topic, type, data, frameId, tfManager) {
@@ -202,6 +192,15 @@ export class ImuPlugin extends VisualizationPlugin {
         <ImuVisualization data={data} />
       </TFWrapper>
     );
+  }
+
+  static getConfigTemplate() {
+    return {
+      scale: {
+        __value__: 0.6,
+        __metadata__: { type: 'number', min: 0.1, max: 5, step: 0.1 },
+      },
+    };
   }
 }
 

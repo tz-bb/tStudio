@@ -31,11 +31,7 @@ function TextVisualization({ data, topic }) {
 // 文本插件
 export class TextPlugin extends VisualizationPlugin {
   constructor() {
-    super('Text', 1, '1.0.0'); // 低优先级，作为后备选项
-  }
-  
-  canHandle(topic, type, data) {
-    return type === 'std_msgs/String'
+    super('Text', 'std_msgs/String', 1, '1.0.0'); // 低优先级，作为后备选项
   }
   
   render(topic, type, data, frameId, tfManager) {
@@ -44,6 +40,19 @@ export class TextPlugin extends VisualizationPlugin {
             <TextVisualization data={data} topic={topic} />
         </TFWrapper>
     );
+  }
+
+  static getConfigTemplate() {
+    return {
+      fontSize: {
+        __value__: 0.4,
+        __metadata__: { type: 'number', min: 0.1, max: 2, step: 0.1 },
+      },
+      color: {
+        __value__: '#ffffff',
+        __metadata__: { type: 'color' },
+      },
+    };
   }
 }
 

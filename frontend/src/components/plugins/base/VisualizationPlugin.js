@@ -3,8 +3,9 @@ import { useFrame } from '@react-three/fiber';
 import { tfManager } from '../../../services/TFManager';
 
 export class VisualizationPlugin {
-  constructor(name, priority = 0, version = '1.0.0') {
+  constructor(name, default_type_str, priority = 0, version = '1.0.0') {
     this.name = name;
+    this.default_type_str = default_type_str;
     this.priority = priority;
     this.version = version;
     this.enabled = true;
@@ -31,11 +32,16 @@ export class VisualizationPlugin {
   }
 
   canHandle(topic, type, data) {
-    throw new Error(`Plugin ${this.name}: canHandle method must be implemented`);
+    return type === this.default_type_str
   }
 
   render(topic, type, data, frameId, tfManager) {
     throw new Error(`Plugin ${this.name}: render method must be implemented`);
+  }
+
+  // 返回此可视化插件的参数模板
+  getConfigTemplate() {
+    throw new Error(`Plugin ${this.name}: getTemplate method must be implemented`);
   }
   
   // 插件初始化（可选）
@@ -96,6 +102,51 @@ export class VisualizationPluginManager {
     return this.plugins.find(plugin => 
       plugin.enabled && plugin.canHandle(topic, type, data)
     );
+  }
+
+  // 根据消息类型查找模板
+  getConfigTemplateByType(topicType) {
+    const plugin = this.plugins.find(p => p.canHandle(null, topicType, null));
+    if (plugin) {
+      try {
+        return plugin.constructor.getConfigTemplate();
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  // 获取所有插件的配置模板
+  getAllConfigTemplates() {
+    const templates = {};
+    this.plugins.forEach(plugin => {
+      try {
+        // 使用 plugin.constructor.getConfigTemplate() 来调用静态方法
+        const template = plugin.constructor.getConfigTemplate();
+        if (template) {
+          // // add topic_type and topic_name
+          // template.topic_type = {
+          //   __value__: plugin.default_type_str,
+          //   __metadata__: {
+          //     type: 'string'
+
+          //   }
+          // };
+          // template.topic_name = {
+          //   __value__: plugin.default_type_str + `(${plugin.name})`,
+          //   __metadata__: {
+          //     type: 'string'
+          //   }
+          // };
+          // 使用插件名称作为键
+          templates[plugin.default_type_str] = template;
+        }
+      } catch (error) {
+        // 忽略没有实现 getTemplate 的插件
+      }
+    });
+    return templates;
   }
   
   // 获取或创建消息实例

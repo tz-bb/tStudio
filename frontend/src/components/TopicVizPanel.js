@@ -12,7 +12,7 @@ const { Panel } = Collapse;
 const { Text } = Typography;
 
 const TopicVizPanel = ({ defaultConfigName = null }) => {
-    const { topics } = useContext(AppContext); // Get topics from context
+    const { topics, scenePluginTemplates, scenePluginsInitialized } = useContext(AppContext); // Get topics and plugin data from context
 
     // State for managing the selection dropdowns
     const [configList, setConfigList] = useState([]);
@@ -50,19 +50,25 @@ const TopicVizPanel = ({ defaultConfigName = null }) => {
             }
         };
         fetchConfigs();
+    }, []);
 
-        // Fetch topic types for the dropdown
-        const fetchTopicTypes = async () => {
+    // Effect to update topic types when plugins are initialized
+    useEffect(() => {
+        if (scenePluginsInitialized) {
             try {
-                const types = await ParameterService.getTopicVizTemplates();
-                setTopicTypes(Object.keys(types));
+                const templates = scenePluginTemplates;
+                console.log("Templates from context: ", templates);
+                const topicTypeNames = Object.keys(templates)
+                    .map(t => t)
+                    .filter(Boolean);
+
+                setTopicTypes(topicTypeNames);
             } catch (err) {
-                setError('Failed to load topic types.');
+                setError('Failed to load topic types from plugins.');
                 console.error(err);
             }
-        };
-        fetchTopicTypes();
-    }, []);
+        }
+    }, [scenePluginsInitialized, scenePluginTemplates]);
 
     // This effect runs when a new config is selected from the dropdown
     useEffect(() => {

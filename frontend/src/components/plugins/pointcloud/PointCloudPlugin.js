@@ -43,11 +43,7 @@ function PointCloud({ data }) {
 // 点云插件 - 支持TF
 export class PointCloudPlugin extends VisualizationPlugin {
   constructor() {
-    super('PointCloud', 10, '1.0.0');
-  }
-  
-  canHandle(topic, type, data) {
-    return type === "sensor_msgs/PointCloud2";
+    super('PointCloud', "sensor_msgs/PointCloud2", 10, '1.0.0');
   }
   
   render(topic, type, data, frameId, tfManager) {
@@ -57,6 +53,19 @@ export class PointCloudPlugin extends VisualizationPlugin {
         <PointCloud data={data} />
       </TFWrapper>
     );
+  }
+
+  getConfigTemplate() {
+    return {
+      point_size: {
+        __value__: 0.05,
+        __metadata__: { type: 'number', min: 0.01, max: 1, step: 0.01 },
+      },
+      color_scheme: {
+        __value__: 'height',
+        __metadata__: { type: 'string', options: ['height', 'intensity', 'rgb'] },
+      },
+    };
   }
 }
 

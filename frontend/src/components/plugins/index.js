@@ -1,10 +1,8 @@
 import { VisualizationPluginManager } from './base/VisualizationPlugin';
 
-// 创建全局插件管理器
 export const pluginManager = new VisualizationPluginManager();
-
-// 使用Webpack的require.context自动发现插件
-function loadPlugins() {
+// This function dynamically imports all plugins from the current directory.
+function discoverPlugins() {
   // 扫描所有插件文件夹中的插件文件
   const pluginModules = require.context(
     './', // 搜索目录
@@ -31,21 +29,15 @@ function loadPlugins() {
   return plugins;
 }
 
-// 初始化插件系统
-export function initializePlugins() {
-  console.log('🔌 Initializing plugin system...');
-  
-  // 自动发现并加载插件
-  const discoveredPlugins = loadPlugins();
-  
-  // 注册所有发现的插件
-  pluginManager.registerPlugins(discoveredPlugins);
-  
-  // 初始化插件管理器
+export function initializePlugins(setPluginTemplates, setPluginsInitialized) {
+  const plugins = discoverPlugins();
+  pluginManager.registerPlugins(plugins);
   pluginManager.initialize();
-  
-  console.log(`✅ Plugin system initialized with ${discoveredPlugins.length} plugins`);
-  
+
+  const templates = pluginManager.getAllConfigTemplates();
+  setPluginTemplates(templates);
+  setPluginsInitialized(true);
+  console.log('Plugins initialized and templates set in context.');
   return pluginManager;
 }
 

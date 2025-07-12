@@ -1,6 +1,7 @@
 import _ from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
 import ParameterService from './ParameterService';
+import { pluginManager } from '../components/plugins'; // 导入插件管理器
 
 class VizConfigManager {
     constructor(configName) {
@@ -37,19 +38,23 @@ class VizConfigManager {
 
     async _addTopic(topicName, topicType) {
         try {
-            // 1. Get the template from the backend without saving
-            const templateData = await ParameterService.getTopicVizTemplate(topicName, topicType);
+            // 1. Get the template from the frontend plugin manager
+            const templateData = pluginManager.getConfigTemplateByType(topicType);
+
+            // If no template, create a default empty object
+            const newTopicData = templateData || {};
+
+            // Add topic_name and topic_type to the data
+            _.set(newTopicData, 'topic_name', { __value__: topicName, __metadata__: { type: 'string', readonly: false } });
+            _.set(newTopicData, 'topic_type', { __value__: topicType, __metadata__: { type: 'string', readonly: true } });
 
             // 2. Generate a unique ID for the new topic on the client-side
             const topicId = `topics.topic_${uuidv4()}`;
 
             // 3. Add the new topic to the current working configuration
-            if (templateData) {
-                _.set(this.currentConfig, topicId, templateData);
-                this.notify(); // Notify listeners to update the UI
-            } else {
-                console.warn('Received empty template from server.');
-            }
+            _.set(this.currentConfig, topicId, newTopicData);
+            this.notify(); // Notify listeners to update the UI
+
         } catch (error) {
             console.error(`Failed to get template for topic '${topicName}' with type '${topicType}':`, error);
             throw error;

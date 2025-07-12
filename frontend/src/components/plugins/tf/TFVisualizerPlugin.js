@@ -69,15 +69,36 @@ const TFTree = () => {
 
 export class TFVisualizerPlugin extends VisualizationPlugin {
   constructor() {
-    super('TF', 1, '1.0.0');
-  }
-
-  canHandle(topic, type, data) {
-    return type === 'tf2_msgs/TFMessage';
+    super('TF', 'tf2_msgs/TFMessage', 1, '1.0.0');
   }
 
   render(topic, type, data, frameId) {
     return <TFTree key={`tf-tree-${Date.now()}`} />;
+  }
+
+  static getConfigTemplate() {
+    return {
+      show_names: {
+        __value__: true,
+        __metadata__: { type: 'boolean' },
+      },
+      show_axes: {
+        __value__: true,
+        __metadata__: { type: 'boolean' },
+      },
+      show_arrows: {
+        __value__: true,
+        __metadata__: { type: 'boolean' },
+      },
+      marker_scale: {
+        __value__: 0.5,
+        __metadata__: { type: 'number', min: 0.1, max: 5, step: 0.1 },
+      },
+      marker_alpha: {
+        __value__: 0.9,
+        __metadata__: { type: 'number', min: 0.1, max: 1.0, step: 0.1 },
+      },
+    };
   }
 }
 

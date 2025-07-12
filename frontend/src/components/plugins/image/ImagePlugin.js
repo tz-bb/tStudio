@@ -183,12 +183,7 @@ function ImageVisualization({ data, topic }) {
 // Image插件类
 export class ImagePlugin extends VisualizationPlugin {
     constructor() {
-        super('ImagePlugin', 5, '1.0.0');
-    }
-
-    canHandle(topic, type, data) {
-        // 检查是否为sensor_msgs/Image类型
-        return type === "sensor_msgs/Image"
+        super('Image', "sensor_msgs/Image", 5, '1.0.0');
     }
 
     render(topic, type, data, frameId, tfManager) {
@@ -201,6 +196,15 @@ export class ImagePlugin extends VisualizationPlugin {
                 />
             </TFWrapper>
         );
+    }
+
+    static getConfigTemplate() {
+        return {
+            scale: {
+                __value__: 2.0,
+                __metadata__: { type: 'number', min: 0.1, max: 10, step: 0.1 },
+            },
+        };
     }
 }
 
