@@ -10,6 +10,7 @@ export const useAppContext = () => useContext(AppContext);
 export const AppProvider = ({ children }) => {
   const [connectionStatus, setConnectionStatus] = useState({ connected: false, adapter: null, config: {}, subscribed_topics: [] });
   const [sceneData, setSceneData] = useState({});
+  const [topics, setTopics] = useState([]);
   const [subscribedTopics, setSubscribedTopics] = useState(new Set());
   const subscribedTopicsRef = useRef(subscribedTopics);
   const [wsManager] = useState(() => new WebSocketManager());
@@ -111,6 +112,8 @@ export const AppProvider = ({ children }) => {
   const value = {
     connectionStatus,
     sceneData,
+    topics,
+    setTopics,
     subscribedTopics,
     wsManager,
     wsStatus,

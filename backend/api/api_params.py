@@ -5,6 +5,7 @@ from typing import Dict, Any, List, Optional
 from app_state import param_manager
 from params.parameter_types import get_type_definitions, create_parameter, ParamNode
 from params.category_manager import CategoryParameterManager
+from params import topic_types
 
 router = APIRouter()
 
@@ -37,10 +38,55 @@ class ParamUpdateRequest(BaseModel):
 class BackupRestoreRequest(BaseModel):
     backup_filename: str
 
+@router.get("/topics/visualization-templates")
+async def get_topic_visualization_templates(
+    topic_name: Optional[str] = Query(None, description="The name of the topic to generate a template for."),
+    topic_type: Optional[str] = Query(None, description="The type of the topic to generate a template for."),
+    param_manager: CategoryParameterManager = Depends(get_param_manager)
+):
+    """Get all available topic visualization templates, or a specific one if topic_type is provided."""
+    if topic_type:
+        if not topic_name:
+            topic_name = "/new_topic"+topic_type
+        try:
+            topic_subtree = param_manager.get_topic_visualization_template(
+                topic_name=topic_name,
+                topic_type=topic_type
+            )
+            return topic_subtree.to_dict()
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+    
+    # Original functionality: return all template names
+    templates = topic_types.get_topic_type_templates()
+    return {"templates": templates}
+
 @router.get("/configs")
 async def list_all_config_categories(param_manager: CategoryParameterManager = Depends(get_param_manager)):
     structure = await param_manager.get_all_configs_structure()
     return {"configs": structure}
+
+@router.post("/configs/{category}", status_code=201)
+async def create_new_config(
+    category: str,
+    request: Request,
+    param_manager: CategoryParameterManager = Depends(get_param_manager)
+):
+    """Create a new, empty configuration file in a given category."""
+    body = await request.json()
+    config_name = body.get('name')
+    if not config_name:
+        raise HTTPException(status_code=400, detail="'name' field is required to create a new config.")
+
+    try:
+        new_config = await param_manager.create_new_config(config_name, category)
+        return new_config.to_clean_dict()
+    except FileExistsError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
 @router.get("/configs/{category}")
 async def list_configs_by_category(category: str, param_manager: CategoryParameterManager = Depends(get_param_manager)):

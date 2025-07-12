@@ -1,21 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react'; // Import useContext
 import ApiService from '../services/ApiService';
 import './TopicPanel.css';
+import { AppContext } from '../services/AppContext'; // Import AppContext
 
-function TopicPanel({ connectionStatus, wsManager }) { // Removed topics and setTopics from props
-  const [topics, setTopics] = useState([]); // Added internal state for topics
+function TopicPanel({ connectionStatus, wsManager }) {
+  const { topics, setTopics, subscribedTopics, setSubscribedTopics } = useContext(AppContext); // Use context
   const [loading, setLoading] = useState(false);
-  const [subscribedTopics, setSubscribedTopics] = useState(new Set());
 
   useEffect(() => {
     if (connectionStatus.connected) {
       loadTopics();
-      setSubscribedTopics(new Set(connectionStatus.subscribed_topics));
+      // Subscribed topics are now managed by AppContext, no need to set them here from connectionStatus
     } else {
-      setTopics([]); // This now correctly updates the internal state
-      setSubscribedTopics(new Set());
+      setTopics([]);
+      setSubscribedTopics(new Set()); // Clear topics in context on disconnect
     }
-  }, [connectionStatus]); // Removed setTopics from dependency array
+  }, [connectionStatus, setTopics, setSubscribedTopics]); // Add setTopics to dependency array
 
   const loadTopics = async () => {
     setLoading(true);
@@ -32,7 +32,7 @@ function TopicPanel({ connectionStatus, wsManager }) { // Removed topics and set
   const handleSubscribe = async (topic, messageType) => {
     try {
       await ApiService.subscribeTopic(topic, messageType);
-      setSubscribedTopics(prev => new Set([...prev, topic]));
+      // No longer need to call setSubscribedTopics, as it's handled by the WebSocket event in AppContext
     } catch (error) {
       console.error('Failed to subscribe:', error);
       alert('订阅失败: ' + error.message);
@@ -42,11 +42,7 @@ function TopicPanel({ connectionStatus, wsManager }) { // Removed topics and set
   const handleUnsubscribe = async (topic) => {
     try {
       await ApiService.unsubscribeTopic(topic);
-      setSubscribedTopics(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(topic);
-        return newSet;
-      });
+      // No longer need to call setSubscribedTopics, as it's handled by the WebSocket event in AppContext
     } catch (error) {
       console.error('Failed to unsubscribe:', error);
       alert('取消订阅失败: ' + error.message);

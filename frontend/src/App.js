@@ -246,7 +246,7 @@ const App = () => {
   );
 
   return (
-    <AppProvider value={{ onAddWindow, availableLayouts, handleLoadLayout, handleSaveLayout, handleResetLayout, handleOverwriteLayout, currentLayoutName, showSaveDialog, setShowSaveDialog }}>
+    <AppProvider>
       <ConfigProvider theme={{ algorithm: theme.darkAlgorithm }}>
         <div className="app-container">
           <div className="app-menu-bar">

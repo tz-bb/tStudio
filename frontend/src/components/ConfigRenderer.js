@@ -56,7 +56,7 @@ const ParameterControl = ({ nodeData, path, onValueChange }) => {
     }
 };
 
-const ConfigRenderer = ({ jsonData, originalJsonData, onValueChange }) => {
+const ConfigRenderer = ({ jsonData, originalJsonData, onValueChange, subscribedTopics }) => {
     const [treeData, setTreeData] = useState([]);
     const [expandedKeys, setExpandedKeys] = useState([]);
 
@@ -110,7 +110,13 @@ const ConfigRenderer = ({ jsonData, originalJsonData, onValueChange }) => {
         const originalValue = hasValue ? _.get(originalJsonData, path.concat('__value__')) : undefined;
         const isModified = hasValue && !_.isEqual(data.__value__, originalValue);
 
-        const titleStyle = isModified ? { color: '#1890ff', fontWeight: 'bold' } : {};
+        // Check if the topic is subscribed
+        const isSubscribed = subscribedTopics && subscribedTopics.has(title);
+
+        const titleStyle = {
+            color: isModified ? '#1890ff' : (isSubscribed ? '#52c41a' : 'inherit'),
+            fontWeight: isModified || isSubscribed ? 'bold' : 'normal',
+        };
 
         return (
             <Row justify="space-between" align="middle" style={{ width: '100%' }}>

@@ -52,6 +52,42 @@ class ParameterService {
         return await response.json();
     }
 
+    // --- Topic Visualization Specific Methods ---
+
+    static async getTopicVizTemplates() {
+        const response = await fetch(`${API_BASE_URL}/topics/visualization-templates`);
+        if (!response.ok) throw new Error('Failed to get topic visualization templates');
+        const data = await response.json();
+        return data.templates || {}; // Returns { "topic_type": { ...template... } }
+    }
+
+    static async getTopicVizTemplate(topicName, topicType) {
+        const url = new URL(`${API_BASE_URL}/topics/visualization-templates`);
+        url.searchParams.append('topic_name', topicName);
+        url.searchParams.append('topic_type', topicType);
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || `Failed to get topic visualization template for '${topicName}'`);
+        }
+        return await response.json();
+    }
+
+    static async createNewVizConfig(configName) {
+        const response = await fetch(`${API_BASE_URL}/configs/viz`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: configName }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || `Failed to create new viz config '${configName}'`);
+        }
+        return await response.json();
+    }
+
     // --- Atomic Parameter-level Methods ---
 
     static async getParameterNode(category, configName, path, field = null) {

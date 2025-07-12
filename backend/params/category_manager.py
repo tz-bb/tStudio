@@ -1,7 +1,9 @@
 import os
+import uuid
 from typing import Dict, Any, List, Optional, Set
 from .adapters.file_adapter import FileParameterAdapter
 from .parameter_types import ParamNode, build_param_tree, create_parameter
+from . import topic_types
 
 class CategoryParameterManager:
     """按类别管理不同的参数适配器，并使用 ParamNode 模型进行操作。"""
@@ -32,7 +34,36 @@ class CategoryParameterManager:
             return None
         if config_data is None:
             return None
-        return build_param_tree(config_data, name=config_name)
+        
+        tree = build_param_tree(config_data, name=config_name)
+
+        # 如果是viz类别，则检查并更新模板
+        if category == 'viz':
+            if await self._update_viz_config_from_topic_template_if_needed(tree):
+                await self._save_tree(tree, category)
+
+        return tree
+
+    async def _update_viz_config_from_topic_template_if_needed(self, tree: ParamNode) -> bool:
+        """检查viz配置是否需要根据其topic类型模板进行更新，如果需要则更新。"""
+        topic_type_node = tree.get_child('topic_type')
+        if not topic_type_node or not topic_type_node.is_value_node:
+            return False
+
+        topic_type = topic_type_node.value
+        template = topic_types.get_template_by_type(topic_type)
+        if not template:
+            return False
+
+        updated = False
+        template_tree = build_param_tree(template)
+
+        for key, template_child in template_tree.children.items():
+            if key not in tree.children:
+                tree.add_child(template_child)
+                updated = True
+        
+        return updated
 
     async def _save_tree(self, tree: ParamNode, category: str) -> bool:
         """将 ParamNode 树序列化并保存到文件。"""
@@ -53,6 +84,21 @@ class CategoryParameterManager:
         adapter = self.get_adapter(category)
         return await adapter.list_configs()
     
+    def get_topic_visualization_template(self, topic_name: str, topic_type: str) -> ParamNode:
+        """Generates a ParamNode subtree for a topic visualization based on a template, without saving."""
+        template = topic_types.get_template_by_type(topic_type)
+        if not template:
+            raise ValueError(f"No template found for topic type '{topic_type}'.")
+
+        # Create subtree from template. The name is not critical here as it will be replaced by a UUID in the frontend.
+        topic_subtree = build_param_tree(template, name="template")
+
+        # Inject topic name and type into the subtree
+        topic_subtree.add_child(create_parameter("string", "topic_name", topic_name, metadata_override={"readonly": False}))
+        topic_subtree.add_child(create_parameter("string", "topic_type", topic_type, metadata_override={"readonly": True}))
+
+        return topic_subtree
+
     async def get_config_data(self, name: str, category: str) -> Optional[ParamNode]:
         """加载配置并返回根 ParamNode 对象。"""
         return await self._load_and_parse_config(name, category)

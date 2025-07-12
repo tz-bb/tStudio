@@ -10,6 +10,7 @@ PARAMETER_TYPE_DEFINITIONS = {
     "color": {"default": "#00000000", "metadata": {}},
     "vector2": {"default": [0.0, 0.0], "metadata": {}},
     "vector3": {"default": [0.0, 0.0, 0.0], "metadata": {}},
+    "enumerate": {"default": "option1", "metadata": {"options": ["option1", "option2", "option3"]}}
 }
 
 class ParamNode:
@@ -145,7 +146,7 @@ def build_param_tree(data: Any, name: str = "__root__", parent: Optional[ParamNo
             
     return node
 
-def create_parameter(param_type: str, name: str, value: Any = "__SENTINEL__") -> ParamNode:
+def create_parameter(param_type: str, name: str, value: Any = "__SENTINEL__", metadata_override: Optional[Dict] = None) -> ParamNode:
     """Creates a new ParamNode with default metadata for a given type."""
     if param_type not in PARAMETER_TYPE_DEFINITIONS:
         raise ValueError(f"Unknown parameter type: {param_type}")
@@ -155,6 +156,8 @@ def create_parameter(param_type: str, name: str, value: Any = "__SENTINEL__") ->
     final_value = value if value != "__SENTINEL__" else type_def['default']
     
     metadata = type_def['metadata'].copy()
+    if metadata_override:
+        metadata.update(metadata_override)
     metadata['type'] = param_type
     
     return ParamNode(name=name, value=final_value, metadata=metadata)
