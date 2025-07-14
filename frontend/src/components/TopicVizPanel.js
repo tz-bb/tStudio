@@ -12,7 +12,7 @@ const { Panel } = Collapse;
 const { Text } = Typography;
 
 const TopicVizPanel = ({ defaultConfigName = null }) => {
-    const { topics, scenePluginTemplates, scenePluginsInitialized } = useContext(AppContext); // Get topics and plugin data from context
+    const { topics, scenePluginTemplates, scenePluginsInitialized, vizConfigs, setVizConfigs } = useContext(AppContext); // Get state from context
 
     // State for managing the selection dropdowns
     const [configList, setConfigList] = useState([]);
@@ -20,7 +20,6 @@ const TopicVizPanel = ({ defaultConfigName = null }) => {
 
     // State for the manager and the data it provides
     const [vizManager, setVizManager] = useState(null);
-    const [currentConfig, setCurrentConfig] = useState(null);
 
     // State for adding new topics
     const [newTopicType, setNewTopicType] = useState('');
@@ -74,20 +73,16 @@ const TopicVizPanel = ({ defaultConfigName = null }) => {
     useEffect(() => {
         if (selectedConfigName) {
             setLoading(true);
-            setCurrentConfig(null);
-
-            const manager = new VizConfigManager(selectedConfigName);
-            manager.subscribe(setCurrentConfig);
+            // Instantiate the manager with state and setters from context
+            const manager = new VizConfigManager(selectedConfigName, setVizConfigs);
 
             manager.loadConfig().finally(() => {
                 setLoading(false);
             });
 
             setVizManager(manager);
-
-            return () => manager.unsubscribe();
         }
-    }, [selectedConfigName]);
+    }, [selectedConfigName, setVizConfigs]); // vizConfigs is not needed here, setVizConfigs is stable
 
     const promptForNewConfig = (action) => {
         setPendingAction(() => action);
@@ -110,7 +105,7 @@ const TopicVizPanel = ({ defaultConfigName = null }) => {
                 // We need to wait for it. A bit tricky.
                 // A simpler way is to just let the user re-trigger the action.
                 // For a better UX, we could do this:
-                const newManager = new VizConfigManager(newConfigName);
+                const newManager = new VizConfigManager(newConfigName, setVizConfigs);
                 await newManager.loadConfig();
                 setVizManager(newManager);
                 pendingAction(newManager); // Execute pending action with the new manager
@@ -133,13 +128,13 @@ const TopicVizPanel = ({ defaultConfigName = null }) => {
         }
         setLoading(true);
         try {
-            const currentTopicsInViz = Object.values(_.get(currentConfig, 'topics', {})).map(t => _.get(t, 'topic_name.__value__'));
+            const currentTopicsInViz = Object.values(_.get(vizConfigs, 'topics', {})).map(t => _.get(t, 'topic_name.__value__'));
             const topicsToAdd = selectedTopics.filter(t => !currentTopicsInViz.includes(t));
 
             for (const topicName of topicsToAdd) {
                 const topicInfo = topics.find(t => t.name === topicName);
                 if (topicInfo) {
-                    await manager.addTopicByName(topicName, topicInfo.type);
+                    await manager.addTopicByName(vizConfigs, topicName, topicInfo.type);
                 } else {
                     console.warn(`Could not find type for topic: ${topicName}, skipping.`);
                     // Optionally, inform the user that the topic type couldn't be found.
@@ -149,9 +144,9 @@ const TopicVizPanel = ({ defaultConfigName = null }) => {
             // Handle removals if necessary
             const topicsToRemove = currentTopicsInViz.filter(t => !selectedTopics.includes(t));
             for (const topicNameToRemove of topicsToRemove) {
-                const topicIdToRemove = Object.keys(_.get(currentConfig, 'topics', {})).find(id => _.get(currentConfig, `topics.${id}.topic_name.__value__`) === topicNameToRemove);
+                const topicIdToRemove = Object.keys(_.get(vizConfigs, 'topics', {})).find(id => _.get(vizConfigs, `topics.${id}.topic_name.__value__`) === topicNameToRemove);
                 if (topicIdToRemove) {
-                    manager.removeTopic(`topics.${topicIdToRemove}`);
+                    manager.removeTopic(vizConfigs, `topics.${topicIdToRemove}`);
                 }
             }
 
@@ -172,7 +167,7 @@ const TopicVizPanel = ({ defaultConfigName = null }) => {
         if (!newTopicType) return;
         setLoading(true);
         try {
-            await manager.addTopicByType(newTopicType); // This now works correctly with the refactored VizConfigManager
+            await manager.addTopicByType(vizConfigs, newTopicType); // This now works correctly with the refactored VizConfigManager
             setNewTopicType('');
         } catch (err) {
             setError(`Failed to add topic of type ${newTopicType}.`);
@@ -183,21 +178,21 @@ const TopicVizPanel = ({ defaultConfigName = null }) => {
     };
 
     const hasUnappliedChanges = useMemo(() => {
-        if (!vizManager) return false;
-        return vizManager.hasUnappliedChanges();
-    }, [vizManager, currentConfig]);
+        if (!vizManager || !vizConfigs) return false;
+        return vizManager.hasUnappliedChanges(vizConfigs);
+    }, [vizManager, vizConfigs]);
 
     const renderTopicPanels = () => {
-        if (!vizManager || !currentConfig) return null;
+        if (!vizManager || !vizConfigs) return null;
 
-        const topicConfigs = _.get(currentConfig, 'topics', {});
+        const topicConfigs = _.get(vizConfigs, 'topics', {});
 
         return (
             <Collapse accordion>
                 {Object.keys(topicConfigs).map(topicKey => {
                     const topicId = ['topics'].concat(topicKey);
                     const topicConfig = topicConfigs[topicKey];
-                    const rendererProps = vizManager.getRendererPropsForTopic(topicId);
+                    const rendererProps = vizManager.getRendererPropsForTopic(vizConfigs, topicId);
                     const topicName = _.get(topicConfig, 'topic_name.__value__', 'Unknown Topic');
                     const topicType = _.get(topicConfig, 'topic_type.__value__', 'Unknown Type');
                     const header = `${topicName} (${topicType})`;
@@ -215,13 +210,13 @@ const TopicVizPanel = ({ defaultConfigName = null }) => {
     const availableTopics = useMemo(() => {
         if (!topics) return [];
         // Filter out topics that are already in the current visualization config
-        const currentTopicNames = Object.values(_.get(currentConfig, 'topics', {})).map(t => _.get(t, 'topic_name.__value__'));
+        const currentTopicNames = Object.values(_.get(vizConfigs, 'topics', {})).map(t => _.get(t, 'topic_name.__value__'));
         return topics.filter(t => !currentTopicNames.includes(t.name));
-    }, [topics, currentConfig]);
+    }, [topics, vizConfigs]);
 
     const selectedTopicNames = useMemo(() => {
-        return Object.values(_.get(currentConfig, 'topics', {})).map(t => _.get(t, 'topic_name.__value__'));
-    }, [currentConfig]);
+        return Object.values(_.get(vizConfigs, 'topics', {})).map(t => _.get(t, 'topic_name.__value__'));
+    }, [vizConfigs]);
 
     return (
         <div style={{ padding: '20px' }}>
@@ -264,7 +259,7 @@ const TopicVizPanel = ({ defaultConfigName = null }) => {
                         <Space>
                             <Button 
                                 type="primary" 
-                                onClick={() => vizManager.applyChanges()}
+                                onClick={() => vizManager.applyChanges(vizConfigs)}
                                 disabled={!hasUnappliedChanges || loading}
                             >
                                 Apply Changes
@@ -286,7 +281,7 @@ const TopicVizPanel = ({ defaultConfigName = null }) => {
                             <Checkbox.Group 
                                 options={topics.map(t => ({ label: t.name, value: t.name }))} 
                                 onChange={handleTopicSelectionChange} 
-                                value={Object.values(currentConfig?.topics || {}).map(t => t.topic_name?.__value__).filter(Boolean)}
+                                value={Object.values(vizConfigs?.topics || {}).map(t => t.topic_name?.__value__).filter(Boolean)}
                             />
                         </Col>
                         <Col span={12}>

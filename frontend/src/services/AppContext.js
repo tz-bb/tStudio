@@ -20,6 +20,7 @@ export const AppProvider = ({ children }) => {
   const [debugInfo, setDebugInfo] = useState([]); // Add debug info state
   const [scenePluginTemplates, setScenePluginTemplates] = useState([]);
   const [scenePluginsInitialized, setScenePluginsInitialized] = useState(false);
+  const [vizConfigs, setVizConfigs] = useState({}); // Initialize with null
 
   // Add debug info function with message aggregation
   const addDebugInfo = (message, type = 'info') => {
@@ -128,6 +129,8 @@ export const AppProvider = ({ children }) => {
     setScenePluginTemplates,
     scenePluginsInitialized,
     setScenePluginsInitialized,
+    vizConfigs,       // Expose viz configs
+    setVizConfigs,  // Expose set function directly
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

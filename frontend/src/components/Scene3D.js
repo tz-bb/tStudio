@@ -5,7 +5,7 @@ import { AppContext } from '../services/AppContext';
 
 function Scene3D({ data }) {
   const [pluginManager, setPluginManager] = useState(null);
-  const { setScenePluginTemplates, setScenePluginsInitialized } = useContext(AppContext);
+  const { setScenePluginTemplates, setScenePluginsInitialized, vizConfigs } = useContext(AppContext);
 
   // 初始化插件系统
   useEffect(() => {
@@ -16,7 +16,7 @@ function Scene3D({ data }) {
     return () => {
       manager.destroy();
     };
-  }, []); // 空依赖数组，确保此 effect 只在挂载和卸载时运行一次
+  }, [setScenePluginTemplates, setScenePluginsInitialized]); // 空依赖数组，确保此 effect 只在挂载和卸载时运行一次
 
   // 监听数据变化，清理不再存在的 topic 实例
   useEffect(() => {
@@ -42,8 +42,14 @@ function Scene3D({ data }) {
       {/* 动态渲染所有话题数据 */}
       {/* 确保 pluginManager 已初始化后再进行渲染，防止空指针错误 */}
       {pluginManager && Object.entries(data).map(([topic, topicData]) => {
-        // 将 tfManager 传递给 render 方法
-        const renderedComponent = pluginManager.render(topic, topicData, tfManager);
+        // Find the corresponding visualization config for this topic
+        const topicConfig = Object.values(vizConfigs?.topics || {}).find(
+          t => t.topic_name?.__value__ === topic
+        );
+        console.log("vizConfig : ",vizConfigs)
+        console.log("topicConfig ; ",topicConfig)
+        // 将 tfManager 和 config 传递给 render 方法
+        const renderedComponent = pluginManager.render(topic, topicData, tfManager, topicConfig);
         return <React.Fragment key={topic}>{renderedComponent}</React.Fragment>;
       })}
     </group>

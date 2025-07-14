@@ -177,7 +177,7 @@ export class VisualizationPluginManager {
   }
   
   // 渲染数据
-  render(topic, message, tfManager) { // 参数从 data 改为 message
+  render(topic, message, tfManager, config) { // 参数从 data 改为 message
     const pluginInstance = this.getOrCreateInstance(topic, message);
     if (!pluginInstance) {
       return null;
@@ -186,7 +186,7 @@ export class VisualizationPluginManager {
     try {
       // 提取 frameId 并传递给插件的 render 方法
       const frameId = message.data?.header?.frame_id || 'world'; // 默认 frame
-      return pluginInstance.render(topic, message.message_type, message.data, frameId, tfManager);
+      return pluginInstance.render(topic, message.message_type, message.data, frameId, tfManager, config);
     } catch (error) {
       console.error(`Plugin ${pluginInstance.name} render error:`, error);
       return null;

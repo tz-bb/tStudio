@@ -3,9 +3,11 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { VisualizationPlugin } from '../base/VisualizationPlugin';
 import { tfManager } from '../../../services/TFManager';
+import { Text } from '@react-three/drei';
 
 // 可视化单个Frame的组件
-const Frame = ({ frameId }) => {
+const Frame = ({ frameId, config }) => {
+
   const groupRef = useRef();
 
   useFrame(() => {
@@ -34,17 +36,28 @@ const Frame = ({ frameId }) => {
 
   return (
     <group ref={groupRef}>
-      <axesHelper args={[0.5]} />
+      {config?.show_axes?.__value__ && <axesHelper args={[config?.marker_scale?.__value__ ?? 0.5]} />}
+      {config?.show_names?.__value__ && (
+        <Text
+          position={[0, 0.1, 0]} // Position text slightly above the origin
+          fontSize={0.1}
+          color="white"
+          anchorX="center"
+          anchorY="middle"
+        >
+          {frameId}
+        </Text>
+      )}
       {/* 递归渲染子节点 */}
       {children.map(childId => (
-        <Frame key={childId} frameId={childId} />
+        <Frame key={childId} frameId={childId} config={config} />
       ))}
     </group>
   );
 };
 
 // 渲染整个TF树的组件
-const TFTree = () => {
+const TFTree = ({ config, tfManager }) => {
   const [rootFrame, setRootFrame] = useState(tfManager.getRootFrame());
 
   useEffect(() => {
@@ -60,20 +73,23 @@ const TFTree = () => {
     return () => {
       tfManager.off('update', handleTFUpdate);
     };
-  }, []); // 空依赖数组确保只在挂载和卸载时运行
+  }, [tfManager]); // 依赖项更新为 tfManager
 
   if (!rootFrame) return null;
 
-  return <Frame frameId={rootFrame} />;
+  return <Frame frameId={rootFrame} config={config} />;
 };
 
-export class TFVisualizerPlugin extends VisualizationPlugin {
+class TFVisualizerPlugin extends VisualizationPlugin {
   constructor() {
     super('TF', 'tf2_msgs/TFMessage', 1, '1.0.0');
   }
 
-  render(topic, type, data, frameId) {
-    return <TFTree key={`tf-tree-${Date.now()}`} />;
+  // eslint-disable-next-line class-methods-use-this
+  render(topic, type, data, frameId, tfManager, config) {
+    // 如果没有提供config，使用默认模板
+    const displayConfig = config || TFVisualizerPlugin.getConfigTemplate();
+    return <TFTree key="tf-tree" config={displayConfig} tfManager={tfManager} />;
   }
 
   static getConfigTemplate() {
