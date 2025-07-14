@@ -46,8 +46,6 @@ function Scene3D({ data }) {
         const topicConfig = Object.values(vizConfigs?.topics || {}).find(
           t => t.topic_name?.__value__ === topic
         );
-        console.log("vizConfig : ",vizConfigs)
-        console.log("topicConfig ; ",topicConfig)
         // 将 tfManager 和 config 传递给 render 方法
         const renderedComponent = pluginManager.render(topic, topicData, tfManager, topicConfig);
         return <React.Fragment key={topic}>{renderedComponent}</React.Fragment>;
