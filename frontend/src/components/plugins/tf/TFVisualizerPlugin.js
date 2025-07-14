@@ -6,7 +6,7 @@ import { tfManager } from '../../../services/TFManager';
 import { Text } from '@react-three/drei';
 
 // 可视化单个Frame的组件
-const Frame = ({ frameId, config }) => {
+function Frame({ frameId, config, tfManager }) {
 
   const groupRef = useRef();
 
@@ -36,25 +36,24 @@ const Frame = ({ frameId, config }) => {
 
   return (
     <group ref={groupRef}>
-      {config?.show_axes?.__value__ && <axesHelper args={[config?.marker_scale?.__value__ ?? 0.5]} />}
-      {config?.show_names?.__value__ && (
-        <Text
-          position={[0, 0.1, 0]} // Position text slightly above the origin
-          fontSize={0.1}
-          color="white"
-          anchorX="center"
-          anchorY="middle"
-        >
-          {frameId}
-        </Text>
-      )}
-      {/* 递归渲染子节点 */}
+      <axesHelper args={[config?.marker_scale?.__value__ ?? 0.5]} visible={!!config?.show_axes?.__value__} />
+      <Text
+        position={[0, 0.1, 0]} // Position text slightly above the origin
+        fontSize={0.1}
+        color="white"
+        anchorX="center"
+        anchorY="middle"
+        visible={!!config?.show_names?.__value__}
+      >
+        {frameId}
+      </Text>
+
       {children.map(childId => (
-        <Frame key={childId} frameId={childId} config={config} />
+        <Frame key={childId} frameId={childId} config={config} tfManager={tfManager} />
       ))}
     </group>
   );
-};
+}
 
 // 渲染整个TF树的组件
 const TFTree = ({ config, tfManager }) => {
@@ -77,7 +76,7 @@ const TFTree = ({ config, tfManager }) => {
 
   if (!rootFrame) return null;
 
-  return <Frame frameId={rootFrame} config={config} />;
+  return <Frame frameId={rootFrame} config={config} tfManager={tfManager} />;
 };
 
 class TFVisualizerPlugin extends VisualizationPlugin {
