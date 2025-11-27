@@ -20,9 +20,10 @@ function TFWrapper({ frameId, tfManager, children }) {
       const fixedFrame = tfManager.getRootFrame(); // 假设 tfManager 提供了获取根节点的方法
       const transform = tfManager.getTransform(frameId, fixedFrame);
       if (transform) {
-        const { translation, rotation } = transform;
-        groupRef.current.position.set(translation.x, translation.y, translation.z);
-        groupRef.current.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
+        const { position, quaternion } = transform;
+        groupRef.current.position.set(position.x, position.y, position.z);
+        groupRef.current.quaternion.set(quaternion.x, quaternion.y, quaternion.z, quaternion.w);
+        groupRef.current.visible = true;
       } else {
         // 如果找不到变换，可以选择隐藏对象或保持在原位
         console.warn(`Transform from ${fixedFrame} to ${frameId} not found.`);

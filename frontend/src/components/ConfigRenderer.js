@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Tree, Input, Slider, Checkbox, InputNumber, ColorPicker,
+    Tree, Input, Slider, Checkbox, InputNumber, ColorPicker, Select,
     Row, Col, Typography, Tooltip, Space
 } from 'antd';
 import { CaretDownOutlined } from '@ant-design/icons';
@@ -9,6 +9,8 @@ import _ from 'lodash';
 const { Text } = Typography;
 
 // Renders the appropriate UI control for a given parameter type.
+const { Option } = Select;
+
 const ParameterControl = ({ nodeData, path, onValueChange }) => {
     const { __value__, __metadata__ = {} } = nodeData;
     const type = __metadata__.type;
@@ -50,6 +52,22 @@ const ParameterControl = ({ nodeData, path, onValueChange }) => {
             );
         case 'boolean':
             return <Checkbox checked={__value__} onChange={(e) => handleValueChange(e.target.checked)} />;
+        case 'enumerate':
+            return (
+                <Row align="middle" style={{ width: '100%' }} onMouseDown={(e) => e.stopPropagation()}>
+                    <Col span={12}>
+                        <Select
+                            style={{ width: 200 }}
+                            value={__value__}
+                            onChange={handleValueChange}
+                        >
+                            {(Array.isArray(__metadata__.options) ? __metadata__.options : []).map(opt => (
+                                <Option key={opt} value={opt}>{opt}</Option>
+                            ))}
+                        </Select>
+                    </Col>
+                </Row>
+            );
         case 'string':
         default:
             return <Input value={__value__} onChange={(e) => handleValueChange(e.target.value)} style={{ width: 200 }} />;

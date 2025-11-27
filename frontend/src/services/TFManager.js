@@ -1,4 +1,4 @@
-import * as THREE from 'three'; // THREE 将被移除，但我们先保留它以便计算
+import * as THREE from 'three';
 
 export class TFManager {
   constructor() {
@@ -6,6 +6,7 @@ export class TFManager {
     this.frameHierarchy = new Map(); // child_frame -> parent_frame
     this.childrenMap = new Map(); // parent_frame -> [child_frame]
     this.listeners = new Map(); // event_name -> [callback]
+    this._basis = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
   }
 
   // 添加事件监听
@@ -40,7 +41,7 @@ export class TFManager {
       // 确保父节点也存在于frames中
       if (parentFrameId && !this.frames.has(parentFrameId)) {
         this.frames.set(parentFrameId, {
-          parent: null, // 显式表示没有父节点
+          parent: null,
           transform: {
             translation: new THREE.Vector3(0, 0, 0),
             rotation: new THREE.Quaternion(0, 0, 0, 1),
@@ -48,20 +49,27 @@ export class TFManager {
           timestamp: header.stamp
         });
       }
-      
+
+      // 应用坐标系基变换
+      const tVec = new THREE.Vector3(tf.translation.x, tf.translation.y, tf.translation.z);
+      tVec.applyQuaternion(this._basis);
+      const qRos = new THREE.Quaternion(tf.rotation.x, tf.rotation.y, tf.rotation.z, tf.rotation.w);
+      const basis = this._basis.clone();
+      const basisInv = this._basis.clone().invert();
+      const qThree = basis.multiply(qRos).multiply(basisInv);
+
       this.frames.set(child_frame_id, {
         parent: parentFrameId,
         transform: {
-          translation: new THREE.Vector3(tf.translation.x, tf.translation.y, tf.translation.z),
-          rotation: new THREE.Quaternion(tf.rotation.x, tf.rotation.y, tf.rotation.z, tf.rotation.w),
+          translation: tVec,
+          rotation: qThree,
         },
         timestamp: header.stamp
       });
-      
+
       // 更新父子关系
       const oldParent = this.frameHierarchy.get(child_frame_id);
       if (oldParent && oldParent !== parentFrameId) {
-        // 如果父节点改变，从旧的父节点子列表中移除
         const childrenOfOldParent = this.childrenMap.get(oldParent);
         if (childrenOfOldParent) {
           const index = childrenOfOldParent.indexOf(child_frame_id);
@@ -73,7 +81,6 @@ export class TFManager {
 
       this.frameHierarchy.set(child_frame_id, parentFrameId);
 
-      // 更新新的父节点的子列表
       if (!this.childrenMap.has(parentFrameId)) {
         this.childrenMap.set(parentFrameId, []);
       }

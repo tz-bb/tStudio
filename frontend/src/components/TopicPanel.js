@@ -4,7 +4,7 @@ import './TopicPanel.css';
 import { AppContext } from '../services/AppContext'; // Import AppContext
 
 function TopicPanel({ connectionStatus, wsManager }) {
-  const { topics, setTopics, subscribedTopics, setSubscribedTopics } = useContext(AppContext); // Use context
+  const { topics, setTopics, subscribedTopics, setSubscribedTopics, topicDataCounts } = useContext(AppContext); // Use context
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -32,6 +32,10 @@ function TopicPanel({ connectionStatus, wsManager }) {
   const handleSubscribe = async (topic, messageType) => {
     try {
       await ApiService.subscribeTopic(topic, messageType);
+      const status = await ApiService.getConnectionStatus();
+      if (Array.isArray(status.subscribed_topics)) {
+        setSubscribedTopics(new Set(status.subscribed_topics));
+      }
       // No longer need to call setSubscribedTopics, as it's handled by the WebSocket event in AppContext
     } catch (error) {
       console.error('Failed to subscribe:', error);
@@ -42,6 +46,10 @@ function TopicPanel({ connectionStatus, wsManager }) {
   const handleUnsubscribe = async (topic) => {
     try {
       await ApiService.unsubscribeTopic(topic);
+      const status = await ApiService.getConnectionStatus();
+      if (Array.isArray(status.subscribed_topics)) {
+        setSubscribedTopics(new Set(status.subscribed_topics));
+      }
       // No longer need to call setSubscribedTopics, as it's handled by the WebSocket event in AppContext
     } catch (error) {
       console.error('Failed to unsubscribe:', error);
@@ -62,26 +70,35 @@ function TopicPanel({ connectionStatus, wsManager }) {
       <div className="topics-list">
         {topics.map((topic, index) => (
           <div key={index} className="topic-item">
-            <div className="topic-info">
-              <div className="topic-name">{topic.name}</div>
-              <div className="topic-type">{topic.type}</div>
-            </div>
-            <div className="topic-actions">
-              {subscribedTopics.has(topic.name) ? (
-                <button 
-                  onClick={() => handleUnsubscribe(topic.name)}
-                  className="unsubscribe-btn"
-                >
-                  取消订阅
-                </button>
-              ) : (
-                <button 
-                  onClick={() => handleSubscribe(topic.name, topic.type)}
-                  className="subscribe-btn"
-                >
-                  订阅
-                </button>
-              )}
+            <div className="topic-grid">
+              <div className="topic-left">
+                <div className="topic-name">{topic.name}</div>
+                <div className="topic-type">{topic.type}</div>
+              </div>
+              <div className="topic-right">
+                {subscribedTopics.has(topic.name) && (
+                  <div className="topic-count-badge" title="接收数据次数">
+                    {topicDataCounts.get(topic.name) || 0}
+                  </div>
+                )}
+                <div className="topic-actions">
+                  {subscribedTopics.has(topic.name) ? (
+                    <button 
+                      onClick={() => handleUnsubscribe(topic.name)}
+                      className="unsubscribe-btn"
+                    >
+                      取消订阅
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => handleSubscribe(topic.name, topic.type)}
+                      className="subscribe-btn"
+                    >
+                      订阅
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         ))}

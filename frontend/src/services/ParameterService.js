@@ -54,16 +54,15 @@ class ParameterService {
 
     // --- Topic Visualization Specific Methods ---
 
-    static async createNewVizConfig(configName) {
-        const response = await fetch(`${API_BASE_URL}/configs/viz`, {
+    static async createNewConfig(category, configName) {
+        const response = await fetch(`${API_BASE_URL}/configs/${category}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: configName }),
         });
-
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.detail || `Failed to create new viz config '${configName}'`);
+            throw new Error(error.detail || `Failed to create new config '${configName}' in category '${category}'`);
         }
         return await response.json();
     }

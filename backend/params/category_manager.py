@@ -52,6 +52,17 @@ class CategoryParameterManager:
             adapter = self.get_adapter(category)
             structure[category] = await adapter.list_configs()
         return structure
+
+    async def create_new_config(self, name: str, category: str) -> ParamNode:
+        adapter = self.get_adapter(category)
+        existing = await adapter.load_config(name)
+        if existing is not None:
+            raise FileExistsError(f"Config '{name}' already exists in category '{category}'")
+
+        empty_root = {}
+        tree = build_param_tree(empty_root, name=name)
+        await self._save_tree(tree, category)
+        return tree
     
     async def get_configs_list(self, category: str) -> List[str]:
         adapter = self.get_adapter(category)

@@ -5,7 +5,8 @@ from .base_adapter import BaseAdapter
 import roslibpy
 
 class ROSAdapter(BaseAdapter):
-    """ROS1 数据适配器 - 通过 rosbridge 连接到 ROS1 系统"""
+    """ROS 数据适配器 - 通过 rosbridge 连接到 ROS1/ROS2 系统
+        https://github.com/RobotWebTools/rosbridge_suite"""
     
     def __init__(self):
         super().__init__()
@@ -32,7 +33,7 @@ class ROSAdapter(BaseAdapter):
                 {
                     "name": "port",
                     "type": "number",
-                    "label": "ROS Bridge 端口",
+                    "label": "ROS Bridge 端口（默认 9090，ROS1/ROS2）",
                     "default": 9090,
                     "required": True,
                     "min": 1,
@@ -43,7 +44,7 @@ class ROSAdapter(BaseAdapter):
     
     @classmethod
     def get_display_name(cls) -> str:
-        return "ROS1 Bridge"
+        return "ROS Bridge"
     
     async def connect(self, config: Dict[str, Any]) -> bool:
         try:
@@ -74,6 +75,15 @@ class ROSAdapter(BaseAdapter):
                 # 启动批处理任务
                 await self._start_batch_update_task()
                 
+                try:
+                    await self.subscribe_topic('/tf')
+                except Exception as e:
+                    print(f"Auto-subscribe /tf failed: {e}")
+                try:
+                    await self.subscribe_topic('/tf_static')
+                except Exception as e:
+                    print(f"Auto-subscribe /tf_static failed: {e}")
+
                 print(f"Connected to ROS Bridge at {host}:{port}")
                 return True
             else:
@@ -242,6 +252,15 @@ class ROSAdapter(BaseAdapter):
     def _handle_ros_message(self, topic: str, message_type: str, message: dict):
         """处理ROS消息（集成插件系统）"""
         try:
+            if topic in ('/tf', '/tf_static'):
+                try:
+                    for t in message.get('transforms', []) or []:
+                        parent = t.get('header', {}).get('frame_id')
+                        child = t.get('child_frame_id')
+                        if parent == 'world' and child == 'map':
+                            print(f"TF received: world -> map (topic {topic})")
+                except Exception:
+                    pass
             converted_data = self._convert_ros_message(topic, message, message_type)
             
             if converted_data and self._main_loop:
@@ -292,6 +311,12 @@ class ROSAdapter(BaseAdapter):
     def _on_error(self, error):
         print(f"ROS Bridge error: {error}")
     
-    def _on_close(self):
+    def _on_close(self, *args, **kwargs):
         print("ROS Bridge connection closed")
         self.is_connected = False
+        try:
+            # 停止批处理任务，避免悬挂定时触发
+            if self._main_loop:
+                asyncio.run_coroutine_threadsafe(self._stop_batch_update_task(), self._main_loop)
+        except Exception as e:
+            print(f"Error stopping batch task on close: {e}")

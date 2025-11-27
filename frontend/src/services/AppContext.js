@@ -21,6 +21,7 @@ export const AppProvider = ({ children }) => {
   const [scenePluginTemplates, setScenePluginTemplates] = useState([]);
   const [scenePluginsInitialized, setScenePluginsInitialized] = useState(false);
   const [vizConfigs, setVizConfigs] = useState({}); // Initialize with null
+  const [topicDataCounts, setTopicDataCounts] = useState(new Map());
 
   // Add debug info function with message aggregation
   const addDebugInfo = (message, type = 'info') => {
@@ -44,6 +45,16 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     const handleConnectionStatus = (data) => {
       setConnectionStatus(data);
+      // Sync subscribed topics from server snapshot (covers default /tf, /tf_static)
+      if (Array.isArray(data.subscribed_topics)) {
+        const initialSet = new Set(data.subscribed_topics);
+        setSubscribedTopics(initialSet);
+        setTopicDataCounts(prev => {
+          const m = new Map(prev);
+          data.subscribed_topics.forEach(t => { if (!m.has(t)) m.set(t, 0); });
+          return m;
+        });
+      }
       addDebugInfo(`Connection status updated: ${data.connected ? 'Connected' : 'Disconnected'} to ${data.adapter}`, 'system');
     };
     const handleDataUpdate = (message) => {
@@ -54,20 +65,34 @@ export const AppProvider = ({ children }) => {
       }
       if (['/system_log','/rosout'].includes(message.topic)) {
         addDebugInfo(message.data.message, message.data.level);
+      } else if (subscribedTopicsRef.current.has(message.topic)) {
+        setSceneData(prev => ({ ...prev, [message.topic]: message }));
+        setTopicDataCounts(prev => {
+          const m = new Map(prev);
+          m.set(message.topic, (m.get(message.topic) || 0) + 1);
+          return m;
+        });
       } else {
         addDebugInfo(`Data received on topic: ${message.topic}`, 'data');
-      }
-      if (subscribedTopicsRef.current.has(message.topic)) {
-        setSceneData(prev => ({ ...prev, [message.topic]: message }));
       }
     };
     const handleTopicSubscribed = (data) => {
       setSubscribedTopics(prev => new Set([...prev, data.topic]));
+      setTopicDataCounts(prev => {
+        const m = new Map(prev);
+        if (!m.has(data.topic)) m.set(data.topic, 0);
+        return m;
+      });
       addDebugInfo(`Subscribed to topic: ${data.topic}`, 'system');
     };
     const handleTopicUnsubscribed = (data) => {
       setSubscribedTopics(prev => { const newSet = new Set(prev); newSet.delete(data.topic); return newSet; });
       setSceneData(prev => { const newSceneData = { ...prev }; delete newSceneData[data.topic]; return newSceneData; });
+      setTopicDataCounts(prev => {
+        const m = new Map(prev);
+        m.delete(data.topic);
+        return m;
+      });
       addDebugInfo(`Unsubscribed from topic: ${data.topic}`, 'system');
     };
     const handleWebSocketConnected = () => {
@@ -77,6 +102,7 @@ export const AppProvider = ({ children }) => {
     const handleWebSocketDisconnected = () => {
       setWsStatus('disconnected');
       addDebugInfo('WebSocket disconnected', 'warning');
+      setTopicDataCounts(new Map());
     };
     const handleWebSocketError = () => {
       setWsStatus('error');
@@ -131,6 +157,7 @@ export const AppProvider = ({ children }) => {
     setScenePluginsInitialized,
     vizConfigs,       // Expose viz configs
     setVizConfigs,  // Expose set function directly
+    topicDataCounts,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

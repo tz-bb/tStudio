@@ -81,7 +81,7 @@ const TFTree = ({ config, tfManager }) => {
 
 class TFVisualizerPlugin extends VisualizationPlugin {
   constructor() {
-    super('TF', 'tf2_msgs/TFMessage', 1, '1.0.0');
+    super('TF', ["tf2_msgs/TFMessage", "tf2_msgs/msg/TFMessage"], 1, '1.0.0');
   }
 
   // eslint-disable-next-line class-methods-use-this

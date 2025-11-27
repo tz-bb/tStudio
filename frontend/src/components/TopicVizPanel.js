@@ -96,7 +96,7 @@ const TopicVizPanel = ({ defaultConfigName = null }) => {
         }
         setLoading(true);
         try {
-            await ParameterService.createNewVizConfig(newConfigName);
+            await ParameterService.createNewConfig('viz', newConfigName);
             setConfigList(prev => [...prev, newConfigName]);
             setSelectedConfigName(newConfigName);
             setIsModalVisible(false);

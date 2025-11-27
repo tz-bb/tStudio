@@ -26,7 +26,9 @@ class VizConfigManager {
     // All methods now accept vizConfigs as the first argument
     _addTopic(vizConfigs, topicName, topicType) {
         try {
-            const templateData = pluginManager.getConfigTemplateByType(topicType);
+            const normalize = (s) => (typeof s === 'string' ? s.replace('/msg/', '/') : s);
+            const normalizedType = normalize(topicType);
+            const templateData = pluginManager.getConfigTemplateByType(normalizedType) || pluginManager.getConfigTemplateByType(topicType);
             const newTopicData = templateData || {};
 
             _.set(newTopicData, 'topic_name', { __value__: topicName, __metadata__: { type: 'string', readonly: false } });

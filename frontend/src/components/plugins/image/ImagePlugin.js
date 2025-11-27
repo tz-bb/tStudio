@@ -183,7 +183,7 @@ function ImageVisualization({ data, topic }) {
 // Image插件类
 export class ImagePlugin extends VisualizationPlugin {
     constructor() {
-        super('Image', "sensor_msgs/Image", 5, '1.0.0');
+        super('Image', ["sensor_msgs/Image", "sensor_msgs/msg/Image"], 5, '1.0.0');
     }
 
     render(topic, type, data, frameId, tfManager) {

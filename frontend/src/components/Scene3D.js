@@ -5,7 +5,7 @@ import { AppContext } from '../services/AppContext';
 
 function Scene3D({ data }) {
   const [pluginManager, setPluginManager] = useState(null);
-  const { setScenePluginTemplates, setScenePluginsInitialized, vizConfigs } = useContext(AppContext);
+  const { setScenePluginTemplates, setScenePluginsInitialized, vizConfigs, addDebugInfo } = useContext(AppContext);
 
   // 初始化插件系统
   useEffect(() => {
@@ -48,6 +48,10 @@ function Scene3D({ data }) {
         );
         // 将 tfManager 和 config 传递给 render 方法
         const renderedComponent = pluginManager.render(topic, topicData, tfManager, topicConfig);
+        if (!renderedComponent) {
+          const type = topicData?.message_type || 'UnknownType';
+          addDebugInfo(`No visualization plugin for ${topic} (${type})`, 'warn');
+        }
         return <React.Fragment key={topic}>{renderedComponent}</React.Fragment>;
       })}
     </group>

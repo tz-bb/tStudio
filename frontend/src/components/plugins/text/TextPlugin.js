@@ -31,7 +31,7 @@ function TextVisualization({ data, topic, config }) {
 // 文本插件
 export class TextPlugin extends VisualizationPlugin {
   constructor() {
-    super('Text', 'std_msgs/String', 1, '1.0.0'); // 低优先级，作为后备选项
+    super('Text', ["std_msgs/String", "std_msgs/msg/String"], 1, '1.0.0'); // 低优先级，作为后备选项
   }
 
   render(topic, type, data, frameId, tfManager, config) {

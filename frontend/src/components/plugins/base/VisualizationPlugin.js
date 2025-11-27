@@ -32,7 +32,13 @@ export class VisualizationPlugin {
   }
 
   canHandle(topic, type, data) {
-    return type === this.default_type_str
+    const normalize = (s) => (typeof s === 'string' ? s.replace('/msg/', '/') : s);
+    const candidate = normalize(type);
+    const t = this.default_type_str;
+    if (Array.isArray(t)) {
+      return t.map(normalize).includes(candidate);
+    }
+    return normalize(t) === candidate;
   }
 
   render(topic, type, data, frameId, tfManager) {
@@ -107,14 +113,18 @@ export class VisualizationPluginManager {
   // 根据消息类型查找模板
   getConfigTemplateByType(topicType) {
     const plugin = this.plugins.find(p => p.canHandle(null, topicType, null));
-    if (plugin) {
-      try {
-        return plugin.constructor.getConfigTemplate();
-      } catch (e) {
-        return null;
+    if (!plugin) return null;
+    try {
+      if (typeof plugin.getConfigTemplate === 'function') {
+        return plugin.getConfigTemplate();
       }
+      if (typeof plugin.constructor.getConfigTemplate === 'function') {
+        return plugin.constructor.getConfigTemplate();
+      }
+      return null;
+    } catch (e) {
+      return null;
     }
-    return null;
   }
 
   // 获取所有插件的配置模板
@@ -125,22 +135,11 @@ export class VisualizationPluginManager {
         // 使用 plugin.constructor.getConfigTemplate() 来调用静态方法
         const template = plugin.constructor.getConfigTemplate();
         if (template) {
-          // // add topic_type and topic_name
-          // template.topic_type = {
-          //   __value__: plugin.default_type_str,
-          //   __metadata__: {
-          //     type: 'string'
-
-          //   }
-          // };
-          // template.topic_name = {
-          //   __value__: plugin.default_type_str + `(${plugin.name})`,
-          //   __metadata__: {
-          //     type: 'string'
-          //   }
-          // };
-          // 使用插件名称作为键
-          templates[plugin.default_type_str] = template;
+          const types = Array.isArray(plugin.default_type_str) ? plugin.default_type_str : [plugin.default_type_str];
+          types.forEach(t => {
+            const key = (typeof t === 'string') ? t.replace('/msg/', '/') : t;
+            templates[key] = template;
+          });
         }
       } catch (error) {
         // 忽略没有实现 getTemplate 的插件

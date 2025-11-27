@@ -16,8 +16,8 @@ class DataSourceManager:
     
     def _register_default_adapters(self):
         """注册默认适配器"""
+        self.register_adapter('rosbridge', ROSAdapter())
         self.register_adapter('mock', MockAdapter())
-        self.register_adapter('ros1_bridge', ROSAdapter())
     
     def register_adapter(self, name: str, adapter_instance: Any):
         """注册适配器"""

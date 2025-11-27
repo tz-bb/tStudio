@@ -183,7 +183,7 @@ function ImuVisualization({ data }) {
 // IMU插件
 export class ImuPlugin extends VisualizationPlugin {
   constructor() {
-    super('IMU', "sensor_msgs/Imu", 15, '1.0.0'); // 高优先级
+    super('IMU', ["sensor_msgs/Imu", "sensor_msgs/msg/Imu"], 15, '1.0.0'); // 高优先级
   }
   
   render(topic, type, data, frameId, tfManager) {

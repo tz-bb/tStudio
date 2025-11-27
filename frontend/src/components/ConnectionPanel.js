@@ -128,7 +128,7 @@ function ConnectionPanel({ connectionStatus, wsManager }) {
       {!connectionStatus.connected && (
         <div className="connection-form">
           <div className="form-group">
-            <label>适配器类型:</label>
+            <label>适配器类型（ROS bridge 默认端口 9090）:</label>
             <select 
               value={selectedAdapter} 
               onChange={(e) => setSelectedAdapter(e.target.value)}
