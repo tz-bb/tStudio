@@ -134,8 +134,8 @@ function PointCloud({ data, topic, config }) {
         const first = { x: pos.getX(0), y: pos.getY(0), z: pos.getZ(0) };
         const midIdx = Math.floor(count / 2);
         const mid = { x: pos.getX(midIdx), y: pos.getY(midIdx), z: pos.getZ(midIdx) };
-        console.log(`[PointCloud] samples ${topic}: first=(${first.x.toFixed(2)},${first.y.toFixed(2)},${first.z.toFixed(2)}) mid=(${mid.x.toFixed(2)},${mid.y.toFixed(2)},${mid.z.toFixed(2)})`);
-        console.log(`[PointCloud] bbox ${topic}: min=(${bb.min.x.toFixed(2)},${bb.min.y.toFixed(2)},${bb.min.z.toFixed(2)}) max=(${bb.max.x.toFixed(2)},${bb.max.y.toFixed(2)},${bb.max.z.toFixed(2)}) count=${count}`);
+        // console.log(`[PointCloud] samples ${topic}: first=(${first.x.toFixed(2)},${first.y.toFixed(2)},${first.z.toFixed(2)}) mid=(${mid.x.toFixed(2)},${mid.y.toFixed(2)},${mid.z.toFixed(2)})`);
+        // console.log(`[PointCloud] bbox ${topic}: min=(${bb.min.x.toFixed(2)},${bb.min.y.toFixed(2)},${bb.min.z.toFixed(2)}) max=(${bb.max.x.toFixed(2)},${bb.max.y.toFixed(2)},${bb.max.z.toFixed(2)}) count=${count}`);
       }
     }
   }, [data, points, topic, decodedGeometry]);

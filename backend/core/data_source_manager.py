@@ -113,6 +113,21 @@ class DataSourceManager:
         if self.active_adapter and self.active_adapter.is_connected:
             return await self.active_adapter.unsubscribe_topic(topic)
         return False
+
+    async def publish_tool_event(self, event: Dict[str, Any]) -> bool:
+        """将前端工具事件发布到后端适配器（ROS/Mock）"""
+        try:
+            if not self.active_adapter or not self.active_adapter.is_connected:
+                return False
+            evt_type = event.get('type')
+            data = event.get('data', {})
+            params = event.get('params', {})
+            if hasattr(self.active_adapter, 'publish_tool_event'):
+                return await self.active_adapter.publish_tool_event(evt_type, data, params)
+            return False
+        except Exception as e:
+            print(f"publish_tool_event error: {e}")
+            return False
     
     def add_data_callback(self, callback):
         """添加数据回调"""

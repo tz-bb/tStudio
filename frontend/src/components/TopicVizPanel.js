@@ -134,6 +134,8 @@ const TopicVizPanel = ({ defaultConfigName = null }) => {
             for (const topicName of topicsToAdd) {
                 const topicInfo = topics.find(t => t.name === topicName);
                 if (topicInfo) {
+                    console.log("Topic info: ", topicInfo);
+                    console.log("addTopicByName ",topicName);
                     await manager.addTopicByName(vizConfigs, topicName, topicInfo.type);
                 } else {
                     console.warn(`Could not find type for topic: ${topicName}, skipping.`);

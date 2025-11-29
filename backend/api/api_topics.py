@@ -67,6 +67,25 @@ async def websocket_endpoint(websocket: WebSocket):
     client_host = websocket.client.host if websocket.client else "unknown"
     print(f"[WebSocket] 新的连接请求来自: {client_host}")
     
+    async def send_heartbeats():
+        heartbeat_counter = 0
+        try:
+            while True:
+                await asyncio.sleep(5)
+                heartbeat_counter += 1
+                heartbeat = {
+                    "type": "heartbeat",
+                    "data": {
+                        "counter": heartbeat_counter,
+                        "timestamp": datetime.now().isoformat(),
+                        "active_connections": len(manager.active_connections)
+                    }
+                }
+                await websocket.send_text(json.dumps(heartbeat))
+        except Exception as e:
+            print(f"[WebSocket] 心跳任务结束: {e}")
+            return
+
     try:
         await manager.connect(websocket)
         print(f"[WebSocket] 客户端 {client_host} 连接成功")
@@ -87,29 +106,33 @@ async def websocket_endpoint(websocket: WebSocket):
             }
         }
         await websocket.send_text(json.dumps(welcome_msg))
+
+        hb_task = asyncio.create_task(send_heartbeats())
         
-        heartbeat_counter = 0
         while True:
-            await asyncio.sleep(5)
-            heartbeat_counter += 1
-            
-            heartbeat = {
-                "type": "heartbeat",
-                "data": {
-                    "counter": heartbeat_counter,
-                    "timestamp": datetime.now().isoformat(),
-                    "active_connections": len(manager.active_connections)
-                }
-            }
-            
             try:
-                await websocket.send_text(json.dumps(heartbeat))
-            except Exception as e:
-                print(f"[WebSocket] 发送心跳失败给 {client_host}: {e}")
+                packet = await websocket.receive_text()
+                msg = json.loads(packet)
+                msg_type = msg.get("type")
+                if msg_type == "tool_event":
+                    event = msg.get("data", {})
+                    try:
+                        success = await data_source_manager.publish_tool_event(event)
+                        if not success:
+                            print("[WebSocket] 发布tool_event失败，适配器未连接或错误")
+                    except Exception as e:
+                        print(f"[WebSocket] 处理tool_event异常: {e}")
+                else:
+                    # 其余类型暂不处理，可拓展
+                    pass
+            except WebSocketDisconnect:
+                print(f"[WebSocket] 客户端 {client_host} 正常断开连接")
                 break
-                
-    except WebSocketDisconnect:
-        print(f"[WebSocket] 客户端 {client_host} 正常断开连接")
+            except Exception as e:
+                print(f"[WebSocket] 接收/处理消息异常: {e}")
+                break
+
+        hb_task.cancel()
         manager.disconnect(websocket)
     except Exception as e:
         print(f"[WebSocket] 客户端 {client_host} 连接异常: {e}")

@@ -1,5 +1,7 @@
 import asyncio
 import time
+import json
+import math
 from typing import Dict, Any, List, Optional
 from .base_adapter import BaseAdapter
 import roslibpy
@@ -320,3 +322,65 @@ class ROSAdapter(BaseAdapter):
                 asyncio.run_coroutine_threadsafe(self._stop_batch_update_task(), self._main_loop)
         except Exception as e:
             print(f"Error stopping batch task on close: {e}")
+
+    async def publish_tool_event(self, evt_type: str, data: Dict[str, Any], params: Dict[str, Any]) -> bool:
+        try:
+            if not self.is_connected or not self.ros:
+                return False
+            topic_name = params.get('publish_topic', f"/default_{evt_type}")
+            message_type = self._get_ros_message_type(evt_type)
+            if not message_type:
+                return False
+            topic = roslibpy.Topic(self.ros, topic_name, message_type)
+            if evt_type == 'nav_goal':
+                goals = data.get('goals') or []
+                if not goals:
+                    topic.unadvertise()
+                    return False
+                frame_id = params.get('frame_id', 'map')
+                for g in goals:
+                    msg = {
+                        'header': {'frame_id': frame_id},
+                        'pose': {
+                            'position': {'x': g.get('x', 0), 'y': g.get('y', 0), 'z': g.get('z', 0)},
+                            'orientation': self._yaw_to_quaternion(g.get('yaw', 0))
+                        }
+                    }
+                    topic.publish(roslibpy.Message(msg))
+                topic.unadvertise()
+                return True
+            elif evt_type == 'add_mission_point':
+                points = data.get('points') or []
+                frame_id = params.get('frame_id', 'map')
+                poses = []
+                for p in points:
+                    poses.append({
+                        'position': {'x': p.get('x', 0), 'y': p.get('y', 0), 'z': p.get('z', 0)},
+                        'orientation': self._yaw_to_quaternion(p.get('yaw', 0))
+                    })
+                msg = {'header': {'frame_id': frame_id}, 'poses': poses}
+                topic.publish(roslibpy.Message(msg))
+                topic.unadvertise()
+                return True
+            else:
+                payload = {'type': evt_type, 'data': data, 'params': params}
+                msg = {'data': json.dumps(payload)}
+                topic.publish(roslibpy.Message(msg))
+                topic.unadvertise()
+                return True
+        except Exception as e:
+            print(f"ROS adapter publish error: {e}")
+            return False
+
+    def _get_ros_message_type(self, evt_type: str) -> Optional[str]:
+        if evt_type == 'nav_goal':
+            return 'geometry_msgs/PoseStamped'
+        if evt_type == 'add_mission_point':
+            return 'geometry_msgs/PoseArray'
+        return 'std_msgs/String'
+
+    def _yaw_to_quaternion(self, yaw: float) -> Dict[str, float]:
+        hz = yaw or 0.0
+        s = math.sin(hz / 2.0)
+        c = math.cos(hz / 2.0)
+        return {'x': 0.0, 'y': 0.0, 'z': s, 'w': c}

@@ -115,14 +115,20 @@ export class VisualizationPluginManager {
     const plugin = this.plugins.find(p => p.canHandle(null, topicType, null));
     if (!plugin) return null;
     try {
-      if (typeof plugin.getConfigTemplate === 'function') {
-        return plugin.getConfigTemplate();
-      }
-      if (typeof plugin.constructor.getConfigTemplate === 'function') {
+      // 优先使用静态模板方法（多数插件仅实现静态方法）
+      if (plugin.constructor && typeof plugin.constructor.getConfigTemplate === 'function') {
         return plugin.constructor.getConfigTemplate();
+      }
+      // 其次尝试实例方法，但避免调用抽象基类的方法
+      if (
+        typeof plugin.getConfigTemplate === 'function' &&
+        plugin.getConfigTemplate !== VisualizationPlugin.prototype.getConfigTemplate
+      ) {
+        return plugin.getConfigTemplate();
       }
       return null;
     } catch (e) {
+      console.error(`Failed to get template for topic type '${topicType}':`, e);
       return null;
     }
   }

@@ -13,6 +13,34 @@ class PluginManager:
         self.plugins: Dict[str, List[BasePlugin]] = defaultdict(list)
         self.plugin_instances: List[BasePlugin] = []
         self.initialized = False
+        
+    def _normalize_message_type(self, message_type: Optional[str]) -> str:
+        if not message_type:
+            return "unknown"
+        s = str(message_type).strip()
+        if "/msg/" in s:
+            s = s.replace("/msg/", "/")
+        return s
+
+    def _normalize_topic(self, topic: Optional[str]) -> str:
+        if topic is None:
+            return ""
+        s = str(topic).strip()
+        if not s.startswith("/"):
+            s = "/" + s
+        while "//" in s:
+            s = s.replace("//", "/")
+        return s
+
+    def _normalize_pattern(self, pattern: str) -> str:
+        parts = str(pattern).split("#", 1)
+        type_part = parts[0] if parts else "*"
+        topic_part = parts[1] if len(parts) > 1 else "*"
+        if type_part != "*":
+            type_part = self._normalize_message_type(type_part)
+        if topic_part != "*":
+            topic_part = self._normalize_topic(topic_part)
+        return f"{type_part}#{topic_part}"
     
     async def initialize(self, plugins_dir: str = None):
         """初始化插件管理器"""
@@ -74,7 +102,8 @@ class PluginManager:
                 
                 # 注册到对应的模式
                 for pattern in patterns:
-                    self.plugins[pattern].append(plugin_instance)
+                    normalized = self._normalize_pattern(pattern)
+                    self.plugins[normalized].append(plugin_instance)
                 
                 self.plugin_instances.append(plugin_instance)
                 print(f"Registered plugin: {plugin_instance.name} for patterns: {patterns}")
@@ -118,17 +147,19 @@ class PluginManager:
     def _find_matching_plugins(self, topic: str, message_type: str) -> List[BasePlugin]:
         """查找匹配的插件"""
         matching_plugins = []
+        nt = self._normalize_message_type(message_type)
+        tp = self._normalize_topic(topic)
         
         # 精确匹配: message_type#topic
-        exact_key = f"{message_type}#{topic}"
+        exact_key = f"{nt}#{tp}"
         matching_plugins.extend(self.plugins.get(exact_key, []))
         
         # 消息类型匹配: message_type#*
-        type_key = f"{message_type}#*"
+        type_key = f"{nt}#*"
         matching_plugins.extend(self.plugins.get(type_key, []))
         
         # 话题匹配: *#topic
-        topic_key = f"*#{topic}"
+        topic_key = f"*#{tp}"
         matching_plugins.extend(self.plugins.get(topic_key, []))
         
         # 全局匹配: *#*

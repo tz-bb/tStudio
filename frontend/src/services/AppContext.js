@@ -22,6 +22,19 @@ export const AppProvider = ({ children }) => {
   const [scenePluginsInitialized, setScenePluginsInitialized] = useState(false);
   const [vizConfigs, setVizConfigs] = useState({}); // Initialize with null
   const [topicDataCounts, setTopicDataCounts] = useState(new Map());
+  const [currentTool, setCurrentTool] = useState('interact');
+  const [toolParams, setToolParams] = useState({
+    select_area: { shape: 'rectangle', frame_id: 'map', publish_topic: '/selected_area', color: '#44aa44', step_x: 1.0, step_y: 1.0 },
+    nav_goal: { frame_id: 'map', publish_topic: '/goal_pose', use_action: false },
+    add_mission_point: { frame_id: 'map', publish_topic: '/mission_points' },
+    erase_points: { frame_id: 'map' },
+    measure: { frame_id: 'map' }
+  });
+  const [toolPreview, setToolPreview] = useState({ type: null, data: null });
+  const [previewPublished, setPreviewPublished] = useState(false);
+  const [missionPoints, setMissionPoints] = useState([]);
+  const [selectedAreas, setSelectedAreas] = useState([]);
+  const [navGoals, setNavGoals] = useState([]);
 
   // Add debug info function with message aggregation
   const addDebugInfo = (message, type = 'info') => {
@@ -138,6 +151,72 @@ export const AppProvider = ({ children }) => {
     };
   }, [wsManager]);
 
+  const updateToolParams = (tool, params) => {
+    setToolParams(prev => ({ ...prev, [tool]: { ...prev[tool], ...params } }));
+  };
+
+  const publishToolResult = () => {
+    if (!toolPreview || !toolPreview.type) return;
+    const params = toolParams[toolPreview.type] || {};
+    const payload = { ...toolPreview, params };
+    wsManager.send({ type: 'tool_event', data: payload });
+    setPreviewPublished(true);
+  };
+
+  const clearToolPreview = () => {
+    setToolPreview({ type: null, data: null });
+    setPreviewPublished(false);
+  };
+
+  const addMissionPoint = (pose) => {
+    setMissionPoints(prev => [...prev, pose]);
+  };
+
+  const clearMissionPoints = () => {
+    setMissionPoints([]);
+  };
+
+  const publishMissionPoints = () => {
+    if (!missionPoints.length) return;
+    const params = toolParams['add_mission_point'] || {};
+    wsManager.send({ type: 'tool_event', data: { type: 'add_mission_point', data: { points: missionPoints }, params } });
+  };
+
+  const addSelectedArea = (polygon) => {
+    setSelectedAreas([{ polygon, published: false }]);
+  };
+  const clearSelectedAreas = () => {
+    setSelectedAreas([]);
+  };
+  const publishSelectedAreas = () => {
+    if (!selectedAreas.length) return;
+    const params = toolParams['select_area'] || {};
+    const payloadAreas = selectedAreas.map(a => ({ polygon: a.polygon, step_x: params.step_x, step_y: params.step_y }));
+    wsManager.send({ type: 'tool_event', data: { type: 'select_area', data: { areas: payloadAreas }, params } });
+    setSelectedAreas(prev => prev.map(a => ({ ...a, published: true })));
+  };
+
+  const addNavGoal = (pose) => {
+    setNavGoals([{ pose, published: false }]);
+  };
+  const clearNavGoals = () => {
+    setNavGoals([]);
+  };
+  const publishNavGoals = () => {
+    if (!navGoals.length) return;
+    const params = toolParams['nav_goal'] || {};
+    wsManager.send({ type: 'tool_event', data: { type: 'nav_goal', data: { goals: navGoals.map(g => g.pose) }, params } });
+    setNavGoals(prev => prev.map(g => ({ ...g, published: true })));
+  };
+
+  const clearAllToolsState = () => {
+    setToolPreview({ type: null, data: null });
+    setPreviewPublished(false);
+    setMissionPoints([]);
+    setSelectedAreas([]);
+    setNavGoals([]);
+  };
+
   const value = {
     connectionStatus,
     sceneData,
@@ -158,6 +237,28 @@ export const AppProvider = ({ children }) => {
     vizConfigs,       // Expose viz configs
     setVizConfigs,  // Expose set function directly
     topicDataCounts,
+    currentTool,
+    setCurrentTool,
+    toolParams,
+    updateToolParams,
+    toolPreview,
+    setToolPreview,
+    publishToolResult,
+    previewPublished,
+    clearToolPreview,
+    missionPoints,
+    addMissionPoint,
+    clearMissionPoints,
+    publishMissionPoints,
+    selectedAreas,
+    addSelectedArea,
+    clearSelectedAreas,
+    publishSelectedAreas,
+    navGoals,
+    addNavGoal,
+    clearNavGoals,
+    publishNavGoals,
+    clearAllToolsState,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

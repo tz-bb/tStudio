@@ -1,0 +1,112 @@
+{
+    "global": {
+        "tabEnablePopout": true
+    },
+    "borders": [],
+    "layout": {
+        "type": "row",
+        "id": "#d74f9304-7722-4736-b866-550417bea8a0",
+        "children": [
+            {
+                "type": "row",
+                "id": "#79243978-573b-47db-aa0c-4d499f54519e",
+                "children": [
+                    {
+                        "type": "tabset",
+                        "id": "#9d00564c-8dec-4be1-9031-a0aa1579d021",
+                        "weight": 8.508014796547473,
+                        "children": [
+                            {
+                                "type": "tab",
+                                "id": "#78be993d-a084-4ea1-a80c-3867bb829059",
+                                "name": "Tools Panel",
+                                "component": "tools-panel"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "row",
+                        "id": "#8931d60d-252e-4e8a-8fb9-39882c4f5a17",
+                        "weight": 91.49198520345253,
+                        "children": [
+                            {
+                                "type": "row",
+                                "id": "#df2ef699-646a-491b-a2eb-b657ebe375df",
+                                "weight": 21.21026894865526,
+                                "children": [
+                                    {
+                                        "type": "tabset",
+                                        "id": "#eba7a993-69a9-4a8c-917b-0d6e5cb92bd8",
+                                        "weight": 71.61923623369354,
+                                        "children": [
+                                            {
+                                                "type": "tab",
+                                                "id": "#f11639c9-3470-4837-9db3-2b6a1421483b",
+                                                "name": "Controls",
+                                                "component": "control-panel"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "tabset",
+                                        "id": "#84203860-3ee2-439b-8f33-82fb9f93ba7b",
+                                        "weight": 28.380763766306455,
+                                        "children": [
+                                            {
+                                                "type": "tab",
+                                                "id": "#260ce5b0-4c81-44ae-bae2-a65c0eea76bc",
+                                                "name": "System Log",
+                                                "component": "debug-info"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "tabset",
+                                "id": "main-tabset",
+                                "weight": 41.93154034229829,
+                                "children": [
+                                    {
+                                        "type": "tab",
+                                        "id": "#e835c7eb-83f5-4b7d-9b7c-40c0a2134830",
+                                        "name": "3D Scene",
+                                        "component": "scene-3d"
+                                    }
+                                ],
+                                "active": true
+                            },
+                            {
+                                "type": "tabset",
+                                "id": "#57370519-d3e9-4d30-84ab-2b7113970534",
+                                "weight": 36.858190709046454,
+                                "selected": 1,
+                                "children": [
+                                    {
+                                        "type": "tab",
+                                        "id": "#b99620c1-6ec1-47b2-adf7-8ec2a1677878",
+                                        "name": "TF Tree",
+                                        "component": "tf-panel"
+                                    },
+                                    {
+                                        "type": "tab",
+                                        "id": "#4dfd08e4-b23f-42a9-9fa1-50ecedcfbbc1",
+                                        "name": "Topic Viz Panel",
+                                        "component": "topic-viz-panel"
+                                    },
+                                    {
+                                        "type": "tab",
+                                        "id": "#6756f7a2-5dfe-44ed-8ace-a5adb027f66b",
+                                        "name": "Tool Properties",
+                                        "component": "tool-properties"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    "popouts": {}
+}

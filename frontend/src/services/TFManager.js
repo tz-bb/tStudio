@@ -6,7 +6,10 @@ export class TFManager {
     this.frameHierarchy = new Map(); // child_frame -> parent_frame
     this.childrenMap = new Map(); // parent_frame -> [child_frame]
     this.listeners = new Map(); // event_name -> [callback]
-    this._basis = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+    this._basis = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+    this.basisEnabled = false;
+    this.depth = new Map();
+    this.transformCache = new Map();
   }
 
   // 添加事件监听
@@ -30,6 +33,23 @@ export class TFManager {
     if (this.listeners.has(eventName)) {
       this.listeners.get(eventName).forEach(callback => callback(data));
     }
+    if (eventName === 'update') {
+      const root = this.getRootFrame();
+      const focus = ['base_link', 'map', 'odom', 'world'].filter(fid => this.frames.has(fid));
+      const dump = focus.map(fid => {
+        const fr = this.frames.get(fid);
+        const world = this.getTransform(fid, root);
+        return {
+          id: fid,
+          parent: fr?.parent,
+          local_t: fr?.transform?.translation,
+          local_q: fr?.transform?.rotation,
+          world_t: world?.position,
+          world_q: world?.quaternion,
+        };
+      });
+      console.log('[TFManager] focus dump', { root, count: this.frames.size, sample: dump });
+    }
   }
 
   // 更新TF数据
@@ -52,11 +72,16 @@ export class TFManager {
 
       // 应用坐标系基变换
       const tVec = new THREE.Vector3(tf.translation.x, tf.translation.y, tf.translation.z);
-      tVec.applyQuaternion(this._basis);
       const qRos = new THREE.Quaternion(tf.rotation.x, tf.rotation.y, tf.rotation.z, tf.rotation.w);
-      const basis = this._basis.clone();
-      const basisInv = this._basis.clone().invert();
-      const qThree = basis.multiply(qRos).multiply(basisInv);
+      let qThree;
+      if (this.basisEnabled) {
+        tVec.applyQuaternion(this._basis);
+        const basis = this._basis.clone();
+        const basisInv = this._basis.clone().invert();
+        qThree = basis.multiply(qRos).multiply(basisInv);
+      } else {
+        qThree = qRos.clone();
+      }
 
       this.frames.set(child_frame_id, {
         parent: parentFrameId,
@@ -90,6 +115,8 @@ export class TFManager {
       }
     });
 
+    this._recomputeDepths();
+    this.transformCache.clear();
     this.emit('update'); // 数据更新后触发事件
   }
 
@@ -98,77 +125,100 @@ export class TFManager {
     return this.childrenMap.get(frameId) || [];
   }
 
+  _recomputeDepths() {
+    const roots = new Set(this.frames.keys());
+    for (const child of this.frameHierarchy.keys()) {
+      roots.delete(child);
+    }
+    const queue = [];
+    for (const r of roots) {
+      this.depth.set(r, 0);
+      queue.push(r);
+    }
+    while (queue.length) {
+      const p = queue.shift();
+      const d = this.depth.get(p) || 0;
+      const children = this.childrenMap.get(p) || [];
+      for (const c of children) {
+        this.depth.set(c, d + 1);
+        queue.push(c);
+      }
+    }
+  }
+
   // 获取从 sourceFrame 到 targetFrame 的变换
   getTransform(targetFrame, sourceFrame) {
-    // 新增：如果源和目标坐标系相同，返回单位变换
     if (targetFrame === sourceFrame) {
       return {
-        translation: new THREE.Vector3(0, 0, 0),
-        rotation: new THREE.Quaternion(0, 0, 0, 1),
+        position: new THREE.Vector3(0, 0, 0),
+        quaternion: new THREE.Quaternion(0, 0, 0, 1),
       };
     }
 
+    const cacheKey = `${sourceFrame}->${targetFrame}`;
+    if (this.transformCache.has(cacheKey)) {
+      return this.transformCache.get(cacheKey);
+    }
+
     const rootFrame = this.getRootFrame();
-    // 检查非根坐标系是否存在
     if (
       (targetFrame !== rootFrame && !this.frames.has(targetFrame)) ||
       (sourceFrame !== rootFrame && !this.frames.has(sourceFrame))
     ) {
-      return null; // 如果任一非根坐标系不存在，则无法计算
+      return null;
     }
 
-    // 路径查找
     const pathToSource = this._findPathToRoot(sourceFrame);
     const pathToTarget = this._findPathToRoot(targetFrame);
-
     if (!pathToSource.length || !pathToTarget.length) {
-        return null; // 无法追溯到根节点
+      return null;
     }
 
-    // 查找共同祖先
     let i = pathToSource.length - 1;
     let j = pathToTarget.length - 1;
     while (i >= 0 && j >= 0 && pathToSource[i] === pathToTarget[j]) {
       i--;
       j--;
     }
-    const commonAncestor = pathToSource[i + 1];
 
-    // 计算从 source 到共同祖先的变换
-    let transform = new THREE.Matrix4(); // 单位矩阵
-    for (let k = 0; k <= i; k++) {
-      const frameData = this.frames.get(pathToSource[k]);
-      const frameTransform = new THREE.Matrix4().compose(
+    let ancestorToSource = new THREE.Matrix4();
+    for (let k = i; k >= 0; k--) {
+      const childId = pathToSource[k];
+      const frameData = this.frames.get(childId);
+      if (!frameData) continue;
+      const T_parent_to_child = new THREE.Matrix4().compose(
         frameData.transform.translation,
         frameData.transform.rotation,
         new THREE.Vector3(1, 1, 1)
       );
-      transform.premultiply(frameTransform);
+      ancestorToSource.multiply(T_parent_to_child);
     }
 
-    // 计算从 target 到共同祖先的变换，然后取逆
-    let targetToAncestor = new THREE.Matrix4();
-    for (let k = 0; k <= j; k++) {
-      const frameData = this.frames.get(pathToTarget[k]);
-      const frameTransform = new THREE.Matrix4().compose(
+    let ancestorToTarget = new THREE.Matrix4();
+    for (let k = j; k >= 0; k--) {
+      const childId = pathToTarget[k];
+      const frameData = this.frames.get(childId);
+      if (!frameData) continue;
+      const T_parent_to_child = new THREE.Matrix4().compose(
         frameData.transform.translation,
         frameData.transform.rotation,
         new THREE.Vector3(1, 1, 1)
       );
-      targetToAncestor.premultiply(frameTransform);
+      ancestorToTarget.multiply(T_parent_to_child);
     }
 
-    const ancestorToTarget = new THREE.Matrix4().copy(targetToAncestor).invert();
-
-    // 合并变换: source -> ancestor -> target
-    transform.multiply(ancestorToTarget);
+    const sourceToTarget = new THREE.Matrix4()
+      .copy(ancestorToTarget)
+      .multiply(new THREE.Matrix4().copy(ancestorToSource).invert());
 
     const position = new THREE.Vector3();
     const quaternion = new THREE.Quaternion();
     const scale = new THREE.Vector3();
-    transform.decompose(position, quaternion, scale);
+    sourceToTarget.decompose(position, quaternion, scale);
 
-    return { position, quaternion };
+    const result = { position, quaternion };
+    this.transformCache.set(cacheKey, result);
+    return result;
   }
 
   _findPathToRoot(frameId) {
@@ -206,6 +256,12 @@ export class TFManager {
     // 如果有多个根或没有根，返回一个默认的固定参考系
     // TODO: 这个默认值应该可以配置
     return 'world'; 
+  }
+
+  setBasisEnabled(enabled) {
+    this.basisEnabled = !!enabled;
+    this.transformCache.clear();
+    this.emit('update');
   }
 
   /**

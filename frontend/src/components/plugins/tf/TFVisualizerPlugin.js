@@ -5,6 +5,29 @@ import { VisualizationPlugin } from '../base/VisualizationPlugin';
 import { tfManager } from '../../../services/TFManager';
 import { Text } from '@react-three/drei';
 
+function ParentChildEdge({ parentId, childId, tfManager, config }) {
+  const attrRef = useRef();
+  const positions = useMemo(() => new Float32Array(6), []);
+
+  useFrame(() => {
+    const childData = tfManager.frames.get(childId);
+    if (!attrRef.current || !childData || !childData.transform) return;
+    const v = childData.transform.translation;
+    attrRef.current.setXYZ(0, 0, 0, 0);
+    attrRef.current.setXYZ(1, v.x, v.y, v.z);
+    attrRef.current.needsUpdate = true;
+  });
+
+  return (
+    <line>
+      <bufferGeometry>
+        <bufferAttribute ref={attrRef} attach="attributes-position" array={positions} itemSize={3} count={2} />
+      </bufferGeometry>
+      <lineBasicMaterial color="#888888" linewidth={1} transparent opacity={config?.marker_alpha?.__value__ ?? 0.9} />
+    </line>
+  );
+}
+
 // 可视化单个Frame的组件
 function Frame({ frameId, config, tfManager }) {
 
@@ -12,22 +35,14 @@ function Frame({ frameId, config, tfManager }) {
 
   useFrame(() => {
     if (groupRef.current) {
-      const frameData = tfManager.frames.get(frameId);
-      if (frameData && frameData.transform) {
-        const { translation, rotation } = frameData.transform;
-        groupRef.current.position.copy(translation);
-        groupRef.current.quaternion.copy(rotation);
+      const root = tfManager.getRootFrame();
+      const world = tfManager.getTransform(frameId, root);
+      if (world) {
+        groupRef.current.position.copy(world.position);
+        groupRef.current.quaternion.copy(world.quaternion);
         groupRef.current.visible = true;
       } else {
-        // 如果在tfManager中找不到，可能是一个根节点或者数据还未到达
-        const isRoot = !tfManager.frameHierarchy.has(frameId);
-        if(isRoot) {
-          groupRef.current.position.set(0,0,0);
-          groupRef.current.quaternion.set(0,0,0,1);
-          groupRef.current.visible = true;
-        } else {
-          groupRef.current.visible = false;
-        }
+        groupRef.current.visible = false;
       }
     }
   });
@@ -48,35 +63,50 @@ function Frame({ frameId, config, tfManager }) {
         {frameId}
       </Text>
 
+      {(() => {
+        if (frameId === 'base_link') {
+          const root = tfManager.getRootFrame();
+          const world = tfManager.getTransform(frameId, root);
+          const fr = tfManager.frames.get(frameId);
+          console.log('[TFVisualizer] base_link render', {
+            root,
+            id: frameId,
+            parent: fr?.parent,
+            local_t: fr?.transform?.translation,
+            local_q: fr?.transform?.rotation,
+            world_t: world?.position,
+            world_q: world?.quaternion,
+          });
+        }
+        return null;
+      })()}
+
       {children.map(childId => (
-        <Frame key={childId} frameId={childId} config={config} tfManager={tfManager} />
+        <React.Fragment key={`frag-${childId}`}>
+          <ParentChildEdge parentId={frameId} childId={childId} tfManager={tfManager} config={config} />
+          <Frame key={childId} frameId={childId} config={config} tfManager={tfManager} />
+        </React.Fragment>
       ))}
     </group>
   );
 }
 
-// 渲染整个TF树的组件
-const TFTree = ({ config, tfManager }) => {
-  const [rootFrame, setRootFrame] = useState(tfManager.getRootFrame());
-
+const TFWorldView = ({ config, tfManager }) => {
+  const [version, setVersion] = useState(0);
   useEffect(() => {
-    const handleTFUpdate = () => {
-      // 强制组件重新渲染以获取最新的根节点和层级结构
-      setRootFrame(tfManager.getRootFrame());
-    };
-
-    // 监听tfManager的更新事件
+    const handleTFUpdate = () => setVersion(v => v + 1);
     tfManager.on('update', handleTFUpdate);
+    return () => tfManager.off('update', handleTFUpdate);
+  }, [tfManager]);
 
-    // 组件卸载时移除监听
-    return () => {
-      tfManager.off('update', handleTFUpdate);
-    };
-  }, [tfManager]); // 依赖项更新为 tfManager
-
-  if (!rootFrame) return null;
-
-  return <Frame frameId={rootFrame} config={config} tfManager={tfManager} />;
+  const frames = useMemo(() => tfManager.getAllFramesAsArray(), [version]);
+  return (
+    <group>
+      {frames.map(f => (
+        <Frame key={`frame-${f}`} frameId={f} config={config} tfManager={tfManager} />
+      ))}
+    </group>
+  );
 };
 
 class TFVisualizerPlugin extends VisualizationPlugin {
@@ -86,9 +116,8 @@ class TFVisualizerPlugin extends VisualizationPlugin {
 
   // eslint-disable-next-line class-methods-use-this
   render(topic, type, data, frameId, tfManager, config) {
-    // 如果没有提供config，使用默认模板
     const displayConfig = config || TFVisualizerPlugin.getConfigTemplate();
-    return <TFTree key="tf-tree" config={displayConfig} tfManager={tfManager} />;
+    return <TFWorldView key="tf-world" config={displayConfig} tfManager={tfManager} />;
   }
 
   static getConfigTemplate() {
