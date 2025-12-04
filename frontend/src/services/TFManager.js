@@ -48,15 +48,24 @@ export class TFManager {
           world_q: world?.quaternion,
         };
       });
-      console.log('[TFManager] focus dump', { root, count: this.frames.size, sample: dump });
+      // console.log('[TFManager] focus dump', { root, count: this.frames.size, sample: dump });
     }
   }
 
   // 更新TF数据
   updateTF(tfData) {
     tfData.transforms.forEach(transform => {
-      const { header, child_frame_id, transform: tf } = transform;
-      const parentFrameId = header.frame_id;
+      const { header, transform: tf } = transform;
+      let { child_frame_id } = transform;
+      let parentFrameId = header.frame_id;
+
+      // 规范化 frame_id：移除前导斜杠
+      if (child_frame_id && child_frame_id.startsWith('/')) {
+        child_frame_id = child_frame_id.substring(1);
+      }
+      if (parentFrameId && parentFrameId.startsWith('/')) {
+        parentFrameId = parentFrameId.substring(1);
+      }
 
       // 确保父节点也存在于frames中
       if (parentFrameId && !this.frames.has(parentFrameId)) {
@@ -148,6 +157,10 @@ export class TFManager {
 
   // 获取从 sourceFrame 到 targetFrame 的变换
   getTransform(targetFrame, sourceFrame) {
+    // 规范化 frame_id：移除前导斜杠
+    if (targetFrame && targetFrame.startsWith('/')) targetFrame = targetFrame.substring(1);
+    if (sourceFrame && sourceFrame.startsWith('/')) sourceFrame = sourceFrame.substring(1);
+
     if (targetFrame === sourceFrame) {
       return {
         position: new THREE.Vector3(0, 0, 0),
@@ -161,10 +174,7 @@ export class TFManager {
     }
 
     const rootFrame = this.getRootFrame();
-    if (
-      (targetFrame !== rootFrame && !this.frames.has(targetFrame)) ||
-      (sourceFrame !== rootFrame && !this.frames.has(sourceFrame))
-    ) {
+    if (!this.frames.has(targetFrame) || !this.frames.has(sourceFrame)) {
       return null;
     }
 

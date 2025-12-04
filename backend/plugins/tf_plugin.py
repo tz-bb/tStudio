@@ -27,6 +27,17 @@ class TFMessagePlugin(BasePlugin):
             # 合并TF变换到缓冲区
             for transform in transforms:
                 child_frame_id = transform.get('child_frame_id')
+                # 规范化 frame_id：移除前导斜杠
+                if child_frame_id and child_frame_id.startswith('/'):
+                    child_frame_id = child_frame_id[1:]
+                    transform['child_frame_id'] = child_frame_id
+                
+                header = transform.get('header', {})
+                frame_id = header.get('frame_id')
+                if frame_id and frame_id.startswith('/'):
+                    header['frame_id'] = frame_id[1:]
+                    transform['header'] = header
+
                 if child_frame_id:
                     self.tf_buffer[child_frame_id] = transform
             

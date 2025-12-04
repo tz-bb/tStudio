@@ -63,24 +63,6 @@ function Frame({ frameId, config, tfManager }) {
         {frameId}
       </Text>
 
-      {(() => {
-        if (frameId === 'base_link') {
-          const root = tfManager.getRootFrame();
-          const world = tfManager.getTransform(frameId, root);
-          const fr = tfManager.frames.get(frameId);
-          console.log('[TFVisualizer] base_link render', {
-            root,
-            id: frameId,
-            parent: fr?.parent,
-            local_t: fr?.transform?.translation,
-            local_q: fr?.transform?.rotation,
-            world_t: world?.position,
-            world_q: world?.quaternion,
-          });
-        }
-        return null;
-      })()}
-
       {children.map(childId => (
         <React.Fragment key={`frag-${childId}`}>
           <ParentChildEdge parentId={frameId} childId={childId} tfManager={tfManager} config={config} />

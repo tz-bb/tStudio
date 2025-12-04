@@ -7,6 +7,8 @@ import TFWrapper from '../base/TFWrapper'; // 导入 TFWrapper
 function PointCloud({ data, topic, config }) {
   const pointSize = config?.point_size?.__value__ ?? 0.05;
   const scheme = config?.color_scheme?.__value__ ?? 'height';
+  const style = config?.style?.__value__ ?? 'squares'; // 'squares' (points) or 'boxes'
+
   // 如果是 PointCloud2 原始结构，尝试就地解码为几何体（不修改原消息）
   const decodedGeometry = useMemo(() => {
     if (!data) return null;
@@ -69,6 +71,8 @@ function PointCloud({ data, topic, config }) {
         }
       }
 
+      // For 'boxes' style, we might need InstanceMesh instead of Points
+      // But returning BufferGeometry is generic enough.
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
       geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -127,26 +131,69 @@ function PointCloud({ data, topic, config }) {
       console.warn(`[PointCloud] Missing 'points' array for topic ${topic}, keys=${JSON.stringify(keys)}`);
     } else if (points) {
       points.computeBoundingBox();
-      const bb = points.boundingBox;
-      const count = data?.points ? data.points.length : (points.getAttribute('position')?.count || 0);
-      const pos = points.getAttribute('position');
-      if (pos && count > 0) {
-        const first = { x: pos.getX(0), y: pos.getY(0), z: pos.getZ(0) };
-        const midIdx = Math.floor(count / 2);
-        const mid = { x: pos.getX(midIdx), y: pos.getY(midIdx), z: pos.getZ(midIdx) };
-        // console.log(`[PointCloud] samples ${topic}: first=(${first.x.toFixed(2)},${first.y.toFixed(2)},${first.z.toFixed(2)}) mid=(${mid.x.toFixed(2)},${mid.y.toFixed(2)},${mid.z.toFixed(2)})`);
-        // console.log(`[PointCloud] bbox ${topic}: min=(${bb.min.x.toFixed(2)},${bb.min.y.toFixed(2)},${bb.min.z.toFixed(2)}) max=(${bb.max.x.toFixed(2)},${bb.max.y.toFixed(2)},${bb.max.z.toFixed(2)}) count=${count}`);
-      }
     }
   }, [data, points, topic, decodedGeometry]);
 
+  // Use InstancedMesh for boxes
+  if (style === 'boxes') {
+    if (!points) return null;
+    const count = points.getAttribute('position').count;
+    return (
+      <instancedMesh args={[null, null, count]} key={topic}>
+        <boxGeometry args={[pointSize, pointSize, pointSize]} />
+        {/* Use vertexColors prop correctly for MeshStandardMaterial */}
+        <meshStandardMaterial vertexColors={true} />
+        <InstanceBuffer geometry={points} count={count} />
+      </instancedMesh>
+    );
+  }
+
+  // Default 'squares' (points)
   if (!points) return null;
 
   return (
     <points geometry={points}>
-      <pointsMaterial size={pointSize} vertexColors />
+      <pointsMaterial size={pointSize} vertexColors sizeAttenuation={true} />
     </points>
   );
+}
+
+// Helper component to update InstancedMesh matrices from BufferGeometry positions
+function InstanceBuffer({ geometry, count }) {
+  const meshRef = React.useRef();
+  
+  React.useLayoutEffect(() => {
+    if (!meshRef.current) return;
+    const mesh = meshRef.current.parent;
+    if (!mesh) return;
+
+    const positions = geometry.getAttribute('position');
+    const colors = geometry.getAttribute('color');
+    const dummy = new THREE.Object3D();
+    const color = new THREE.Color();
+    
+    for (let i = 0; i < count; i++) {
+      dummy.position.set(positions.getX(i), positions.getY(i), positions.getZ(i));
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+      if (colors) {
+        color.setRGB(colors.getX(i), colors.getY(i), colors.getZ(i));
+        mesh.setColorAt(i, color);
+      }
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) {
+        mesh.instanceColor.needsUpdate = true;
+    } else if (colors) {
+        // If instanceColor attribute doesn't exist yet (first render), we might need to ensure it's created?
+        // Three.js InstancedMesh should create it if we use setColorAt.
+        // However, in React-Three-Fiber, sometimes props update order matters.
+        // We force update to be sure.
+        mesh.instanceColor.needsUpdate = true;
+    }
+  }, [geometry, count]);
+
+  return <primitive object={new THREE.Object3D()} ref={meshRef} visible={false} />;
 }
 
 // 点云插件 - 支持TF
@@ -166,6 +213,10 @@ export class PointCloudPlugin extends VisualizationPlugin {
 
   getConfigTemplate() {
     return {
+      style: {
+        __value__: 'squares',
+        __metadata__: { type: 'enumerate', options: ['squares', 'boxes'] },
+      },
       point_size: {
         __value__: 0.05,
         __metadata__: { type: 'number', min: 0.01, max: 1, step: 0.01 },
