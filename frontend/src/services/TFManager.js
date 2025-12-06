@@ -126,10 +126,52 @@ export class TFManager {
 
     this._recomputeDepths();
     this.transformCache.clear();
-    this.emit('update'); // 数据更新后触发事件
+    this.emit('update');
+    
+    this.logTFHierarchy();
   }
 
-  // 获取子节点
+  // 打印TF树层级结构
+  logTFHierarchy() {
+    console.groupCollapsed('[TFManager] Current TF Hierarchy');
+    
+    const root = this.getRootFrame();
+    if (root) {
+      this._printNodeRecursive(root, 0, root);
+    } else {
+      console.log('No TF root found (empty tree or cycle?)');
+    }
+    
+    console.log(`Total frames: ${this.frames.size}`);
+    console.groupEnd();
+  }
+
+  _printNodeRecursive(frameId, level, rootFrame) {
+    const indent = '  '.repeat(level);
+    const children = this.getChildren(frameId);
+    const frameData = this.frames.get(frameId);
+    
+    let transformInfo = '';
+    let absolutePosInfo = '';
+    
+    if (frameData && frameData.transform) {
+      const { x, y, z } = frameData.transform.translation;
+      transformInfo = `[${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}]`;
+      
+      // Calculate absolute position relative to root
+      const absTransform = this.getTransform(frameId, rootFrame);
+      if (absTransform) {
+          const { x: ax, y: ay, z: az } = absTransform.position;
+          absolutePosInfo = ` (Abs: [${ax.toFixed(2)}, ${ay.toFixed(2)}, ${az.toFixed(2)}])`;
+      }
+    }
+    
+    console.log(`${indent}└─ ${frameId} ${transformInfo}${absolutePosInfo}`);
+    
+    children.forEach(child => {
+      this._printNodeRecursive(child, level + 1, rootFrame);
+    });
+  }
   getChildren(frameId) {
     return this.childrenMap.get(frameId) || [];
   }

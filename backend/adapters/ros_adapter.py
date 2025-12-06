@@ -254,19 +254,8 @@ class ROSAdapter(BaseAdapter):
     def _handle_ros_message(self, topic: str, message_type: str, message: dict):
         """处理ROS消息（集成插件系统）"""
         try:
-            if topic in ('/tf', '/tf_static'):
-                try:
-                    for t in message.get('transforms', []) or []:
-                        parent = t.get('header', {}).get('frame_id')
-                        child = t.get('child_frame_id')
-                        if parent == 'world' and child == 'map':
-                            print(f"TF received: world -> map (topic {topic})")
-                except Exception:
-                    pass
             converted_data = self._convert_ros_message(topic, message, message_type)
-            
             if converted_data and self._main_loop:
-                # 使用基类的缓冲方法（现在包含插件处理）
                 asyncio.run_coroutine_threadsafe(
                     self._buffer_message(topic, converted_data, message_type), 
                     self._main_loop

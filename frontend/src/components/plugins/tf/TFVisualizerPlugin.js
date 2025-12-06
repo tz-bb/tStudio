@@ -11,10 +11,13 @@ function ParentChildEdge({ parentId, childId, tfManager, config }) {
 
   useFrame(() => {
     const childData = tfManager.frames.get(childId);
+
     if (!attrRef.current || !childData || !childData.transform) return;
     const v = childData.transform.translation;
+
     attrRef.current.setXYZ(0, 0, 0, 0);
     attrRef.current.setXYZ(1, v.x, v.y, v.z);
+
     attrRef.current.needsUpdate = true;
   });
 
@@ -29,21 +32,33 @@ function ParentChildEdge({ parentId, childId, tfManager, config }) {
 }
 
 // 可视化单个Frame的组件
-function Frame({ frameId, config, tfManager }) {
+function Frame({ frameId, config, tfManager, isRoot = false }) {
 
   const groupRef = useRef();
 
   useFrame(() => {
     if (groupRef.current) {
-      const root = tfManager.getRootFrame();
-      const world = tfManager.getTransform(frameId, root);
-      if (world) {
-        groupRef.current.position.copy(world.position);
-        groupRef.current.quaternion.copy(world.quaternion);
-        groupRef.current.visible = true;
+      // 如果是根节点，我们需要将其定位到其绝对世界坐标
+      if (isRoot) {
+        const root = tfManager.getRootFrame();
+        // 获取绝对变换 (仅针对根)
+        const world = tfManager.getTransform(frameId, root);
+        if (world) {
+          groupRef.current.position.copy(world.position);
+          groupRef.current.quaternion.copy(world.quaternion);
+        }
       } else {
-        groupRef.current.visible = false;
+        // 子节点：使用相对于父节点的局部变换
+        // 父组件已经在父节点的坐标系中了，所以这里只需要应用 local transform
+        const frameData = tfManager.frames.get(frameId);
+        if (frameData && frameData.transform) {
+            const { translation, rotation } = frameData.transform;
+            groupRef.current.position.copy(translation);
+            groupRef.current.quaternion.copy(rotation);
+        }
       }
+      
+      groupRef.current.visible = true;
     }
   });
 
@@ -66,7 +81,7 @@ function Frame({ frameId, config, tfManager }) {
       {children.map(childId => (
         <React.Fragment key={`frag-${childId}`}>
           <ParentChildEdge parentId={frameId} childId={childId} tfManager={tfManager} config={config} />
-          <Frame key={childId} frameId={childId} config={config} tfManager={tfManager} />
+          <Frame key={childId} frameId={childId} config={config} tfManager={tfManager} isRoot={false} />
         </React.Fragment>
       ))}
     </group>
@@ -81,11 +96,17 @@ const TFWorldView = ({ config, tfManager }) => {
     return () => tfManager.off('update', handleTFUpdate);
   }, [tfManager]);
 
-  const frames = useMemo(() => tfManager.getAllFramesAsArray(), [version]);
+  // Only render root frames to avoid duplication, as Frame component renders children recursively
+  const rootFrames = useMemo(() => {
+    const allFrames = tfManager.getAllFramesAsArray();
+    const roots = allFrames.filter(f => !tfManager.frames.get(f).parent);
+    return roots;
+  }, [version, tfManager]);
+
   return (
     <group>
-      {frames.map(f => (
-        <Frame key={`frame-${f}`} frameId={f} config={config} tfManager={tfManager} />
+      {rootFrames.map(f => (
+        <Frame key={`frame-${f}`} frameId={f} config={config} tfManager={tfManager} isRoot={true} />
       ))}
     </group>
   );
